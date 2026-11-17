@@ -1,5 +1,7 @@
-// Render every repo's docs/ (plus pages/*.ejs) into plain HTML.
-// Usage: node src/render.js MANIFEST OUT_DIR  (manifest from bin/collect.sh)
+// Render every repo's README.md (its entry page) and docs/ (plus
+// pages/*.ejs) into plain HTML, and link the code docs from bin/apidoc.sh.
+// Usage: node src/render.js MANIFEST API_JSON API_DIR OUT_DIR
+//   MANIFEST from bin/collect.sh; API_JSON and API_DIR from bin/apidoc.sh.
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,12 +13,14 @@ import { parse as parseToml } from "smol-toml";
 import { createMarkdown, preprocess } from "./markdown.js";
 
 const WIKI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const [MANIFEST, OUT] = process.argv.slice(2).map((p) => path.resolve(p));
+const [MANIFEST, API_JSON, API_DIR, OUT] = process.argv.slice(2).map((p) => path.resolve(p));
 const TEMPLATES = path.join(WIKI, "templates");
 const PAGES = path.join(WIKI, "pages");
 const posix = path.posix;
 
 const SITE_TITLE = process.env.WIKI_TITLE ?? "jbisfun wiki";
+const IMAGE = /\.(png|jpe?g|gif|svg|webp|avif|ico)$/i;
+const API_LABELS = { rust: "Rust", lua: "Lua", js: "JavaScript" };
 
 // mdBook projects keep pages in book.toml's `src` (default "src").
 async function docsRoot(docsDir) {
@@ -26,14 +30,36 @@ async function docsRoot(docsDir) {
   return { root: path.join(docsDir, book.src ?? "src"), title: book.title ?? null };
 }
 
-async function loadRepos() {
+// Per repo, `files` lists {rel (repo-relative), docRel, out}: the README is
+// the repo's index page, docs/ files go under <repo>/docs/.
+async function loadRepos(api) {
   const manifest = JSON.parse(await readFile(MANIFEST, "utf8"));
   const repos = [];
   for (const repo of manifest.repos) {
-    const { root, title } = await docsRoot(path.join(repo.path, "docs"));
-    const files = (await glob(["**/*"], { cwd: root, ignore: ["**/node_modules/**"] })).sort();
-    if (!files.some((f) => /\.(md|ejs)$/.test(f))) continue;
-    repos.push({ ...repo, root, files, title: title ?? repo.name, blob: repo.web ? `${repo.web}/blob/${repo.branch}/` : null });
+    const files = [];
+    if (repo.readme) files.push({ rel: repo.readme, out: `${repo.name}/index.html` });
+    let docsRel = null;
+    let bookTitle = null;
+    if (repo.docs) {
+      const { root, title } = await docsRoot(path.join(repo.path, "docs"));
+      docsRel = path.relative(repo.path, root).split(path.sep).join("/");
+      bookTitle = title;
+      for (const f of (await glob(["**/*"], { cwd: root, ignore: ["**/node_modules/**"] })).sort()) {
+        files.push({ rel: `${docsRel}/${f}`, docRel: f, out: `${repo.name}/docs/${outName(f)}` });
+      }
+    }
+    const apis = (api[repo.name] ?? []).map((a) => ({ ...a, label: API_LABELS[a.tool] ?? a.tool, out: `${repo.name}/api/${a.path}` }));
+    if (!files.some((f) => /\.(md|ejs)$/.test(f.rel)) && !apis.length) continue;
+    repos.push({
+      ...repo,
+      files,
+      docsRel,
+      bookTitle,
+      apis,
+      title: repo.name,
+      blob: repo.web ? `${repo.web}/blob/${repo.branch}/` : null,
+      raw: repo.web ? `${repo.web}/raw/${repo.branch}/` : null,
+    });
   }
   return repos;
 }
@@ -66,11 +92,11 @@ function titleOf(data, body, rel) {
   return posix.basename(rel).replace(/\.(md|ejs)$/, "").replace(/[-_]/g, " ");
 }
 
-// Nested {name, page, children} tree of a repo's pages, for repos without SUMMARY.md.
+// Nested {name, page, children} tree of a repo's docs pages, for docs without SUMMARY.md.
 function pageTree(pages) {
   const root = { name: "", children: new Map() };
   for (const page of pages) {
-    const parts = page.rel.split("/");
+    const parts = page.docRel.split("/");
     let node = root;
     for (const part of parts.slice(0, -1)) {
       if (!node.children.has(part)) node.children.set(part, { name: part, children: new Map() });
@@ -99,6 +125,22 @@ function frontMatter(source) {
   }
 }
 
+// Plain text of a README's first paragraph with text (not just badges), for
+// the home page cards.
+function firstParagraph(md, source) {
+  const tokens = md.parse(source, {});
+  for (let at = 0; at < tokens.length; at++) {
+    if (tokens[at].type !== "paragraph_open") continue;
+    const text = tokens[at + 1].children
+      .filter((t) => t.type === "text" || t.type === "code_inline" || t.type === "softbreak")
+      .map((t) => (t.type === "softbreak" ? " " : t.content))
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+  return null;
+}
+
 const markActive = (html, from) =>
   html.replaceAll(`href="${posix.basename(from)}"`, `class="active" aria-current="page" href="${posix.basename(from)}"`);
 
@@ -106,33 +148,35 @@ async function main() {
   await rm(OUT, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
 
-  const repos = await loadRepos();
+  const api = existsSync(API_JSON) ? JSON.parse(await readFile(API_JSON, "utf8")) : {};
+  const repos = await loadRepos(api);
   const pages = [];
 
   for (const repo of repos) {
     repo.pages = [];
-    repo.byRel = new Map();
-    for (const rel of repo.files) {
-      const out = `${repo.name}/${outName(rel)}`;
-      repo.byRel.set(rel, out);
-      if (rel === "SUMMARY.md") continue;
+    repo.byRel = new Map(repo.files.map((f) => [f.rel, f.out]));
+    for (const { rel, docRel, out } of repo.files) {
+      if (docRel === "SUMMARY.md") continue;
+      const src = path.join(repo.path, rel);
       if (rel.endsWith(".md") || rel.endsWith(".ejs")) {
-        const src = path.join(repo.root, rel);
         const { data, content } = frontMatter(await readFile(src, "utf8"));
-        const page = { repo, rel, src, out, data, body: content, title: titleOf(data, content, rel) };
+        const page = { repo, rel, docRel, src, out, data, body: content, title: titleOf(data, content, rel), readme: rel === repo.readme };
         repo.pages.push(page);
         pages.push(page);
       } else {
         await mkdir(path.dirname(path.join(OUT, out)), { recursive: true });
-        await cp(path.join(repo.root, rel), path.join(OUT, out));
+        await cp(src, path.join(OUT, out));
       }
     }
-    repo.summary = repo.files.includes("SUMMARY.md")
-      ? await readFile(path.join(repo.root, "SUMMARY.md"), "utf8")
+    if (repo.apis.length) await cp(path.join(API_DIR, repo.name), path.join(OUT, repo.name, "api"), { recursive: true });
+    repo.summary = repo.docsRel && repo.byRel.has(`${repo.docsRel}/SUMMARY.md`)
+      ? (await readFile(path.join(repo.path, repo.docsRel, "SUMMARY.md"), "utf8")).replace(/^#\s+Summary\s*\n/i, "")
       : null;
-    repo.tree = pageTree(repo.pages);
+    repo.docPages = repo.pages.filter((p) => p.docRel);
+    repo.tree = pageTree(repo.docPages);
     repo.index = `${repo.name}/index.html`;
-    if (!repo.pages.some((p) => p.out === repo.index)) {
+    repo.readmePage = repo.pages.find((p) => p.readme) ?? null;
+    if (!repo.readmePage) {
       const page = { repo, rel: "", out: repo.index, data: {}, body: null, title: repo.title, synthetic: true };
       repo.pages.unshift(page);
       pages.push(page);
@@ -154,25 +198,31 @@ async function main() {
       if (!pathPart) return link;
       if (pathPart.startsWith("/")) return url(from, pathPart);
       const target = posix.normalize(posix.join(base, decodeURI(pathPart))).replace(/\/$/, "");
-      for (const candidate of [target, `${target}/README.md`, `${target}/index.md`]) {
+      for (const candidate of [target, `${target}/README.md`, `${target}/readme.md`, `${target}/index.md`]) {
         const out = repo.byRel.get(candidate);
         if (out) return url(from, out) + suffix;
       }
-      // Outside docs/ (source files, missing pages): link to the repo on GitHub.
-      const inRepo = path.relative(repo.path, path.join(repo.root, target));
-      if (repo.blob && !inRepo.startsWith("..")) return repo.blob + inRepo.split(path.sep).join("/") + suffix;
+      // Other files in the repo (source, images, missing pages): GitHub.
+      if (repo.blob && target !== ".." && !target.startsWith("../")) {
+        return (IMAGE.test(target) ? repo.raw : repo.blob) + (target === "." ? "" : target) + suffix;
+      }
       return link;
     },
   });
 
+  for (const repo of repos) repo.description = repo.readmePage ? firstParagraph(md, repo.readmePage.body) : null;
+
   const site = { title: SITE_TITLE, repos: repos, pages };
   const renderMd = (source, env) => md.render(preprocess(source), env);
+  const ejsOpts = (filename) => ({ views: [TEMPLATES], filename });
 
   function sidebar(repo, from) {
     if (!repo) return "";
-    const html = repo.summary
-      ? renderMd(repo.summary, { repo, base: ".", from })
-      : ejs.render('<%- include("partials/tree", { node: tree, url }) %>', { tree: repo.tree, url: (to) => url(from, to) }, { views: [TEMPLATES], filename: path.join(TEMPLATES, "sidebar.ejs") });
+    const link = (to) => url(from, to);
+    const docs = repo.summary
+      ? renderMd(repo.summary, { repo, base: repo.docsRel, from })
+      : ejs.render('<%- include("partials/tree", { node: tree, url }) %>', { tree: repo.tree, url: link }, ejsOpts(path.join(TEMPLATES, "sidebar.ejs")));
+    const html = ejs.render('<%- include("partials/repo-nav") %>', { repo, docs, url: link }, ejsOpts(path.join(TEMPLATES, "sidebar.ejs")));
     return markActive(html, from);
   }
 
@@ -187,24 +237,25 @@ async function main() {
       md: (source) => (page.repo ? renderMd(source, env) : md.render(source)),
       sidebar: () => sidebar(page.repo, from),
     };
-    const ejsOpts = { views: [TEMPLATES], filename: page.src ?? path.join(TEMPLATES, "layout.ejs") };
+    const opts = ejsOpts(page.src ?? path.join(TEMPLATES, "layout.ejs"));
 
     let content;
-    if (page.synthetic) content = await ejs.renderFile(path.join(TEMPLATES, "repo-index.ejs"), data, ejsOpts);
-    else if (page.ejs || page.rel.endsWith(".ejs")) content = ejs.render(page.body, data, ejsOpts);
-    else content = data.md(page.data.ejs ? ejs.render(page.body, data, ejsOpts) : page.body);
+    if (page.synthetic) content = await ejs.renderFile(path.join(TEMPLATES, "repo-index.ejs"), data, opts);
+    else if (page.ejs || page.rel.endsWith(".ejs")) content = ejs.render(page.body, data, opts);
+    else content = data.md(page.data.ejs ? ejs.render(page.body, data, opts) : page.body);
 
     const html =
       page.data.layout === false
         ? content
-        : await ejs.renderFile(path.join(TEMPLATES, page.data.layout ?? "layout.ejs"), { ...data, content }, ejsOpts);
+        : await ejs.renderFile(path.join(TEMPLATES, page.data.layout ?? "layout.ejs"), { ...data, content }, opts);
 
     const dest = path.join(OUT, page.out);
     await mkdir(path.dirname(dest), { recursive: true });
     await writeFile(dest, html);
   }
 
-  console.log(`wiki: ${pages.length} pages from ${repos.map((r) => r.name).join(", ")}`);
+  const apiCount = repos.reduce((n, r) => n + r.apis.length, 0);
+  console.log(`wiki: ${pages.length} pages and ${apiCount} code references from ${repos.map((r) => r.name).join(", ")}`);
 }
 
 await main();

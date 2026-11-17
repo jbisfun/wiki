@@ -11,14 +11,18 @@ default: build
 install:
     pnpm install --frozen-lockfile
 
-# Ask pull which repos have docs/ and write the manifest.
+# Ask pull for the workspace repos and write the manifest.
 collect:
     mkdir -p {{build_dir}}
     bin/collect.sh > {{build_dir}}/manifest.json
 
-# Render markdown and EJS pages into .build/site.
-render: collect
-    node src/render.js {{build_dir}}/manifest.json {{site}}
+# Code reference per repo: rustdoc, LDoc, JSDoc into .build/api.
+apidoc: collect
+    bin/apidoc.sh {{build_dir}}/manifest.json {{build_dir}}/api > {{build_dir}}/api.json
+
+# Render READMEs, markdown and EJS pages into .build/site, with the code reference.
+render: apidoc
+    node src/render.js {{build_dir}}/manifest.json {{build_dir}}/api.json {{build_dir}}/api {{site}}
 
 # Bundle Bootstrap CSS and JS with parcel, then assemble dist/.
 bundle:

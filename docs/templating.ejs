@@ -15,7 +15,7 @@ title: Templating
 <h2>Variables</h2>
 <ul>
   <li><code>site</code>: <code>title</code>, <code>repos</code>, <code>pages</code></li>
-  <li><code>repo</code>: the current repo (<code>name</code>, <code>pages</code>, <code>web</code>, <code>head</code>, ...)</li>
+  <li><code>repo</code>: the current repo (<code>name</code>, <code>pages</code>, <code>readmePage</code>, <code>docPages</code>, <code>apis</code> (<code>{tool, title, label, out}</code>), <code>description</code>, <code>web</code>, <code>head</code>, ...)</li>
   <li><code>page</code>: <code>title</code>, <code>out</code>, front matter as <code>page.data</code></li>
   <li><code>url(path)</code>: site-relative path to a link from this page</li>
   <li><code>md(source)</code>: render markdown</li>
@@ -23,10 +23,10 @@ title: Templating
 <p>Front matter <code>layout: false</code> skips <code>templates/layout.ejs</code>; <code>layout: other.ejs</code> picks another one. Markdown pages can opt in to EJS with <code>ejs: true</code>.</p>
 
 <h2>Live example</h2>
-<p>This workspace has <%= site.repos.length %> documented repos and <%= site.pages.length %> pages:</p>
+<p>This workspace has <%= site.repos.length %> repos and <%= site.pages.length %> pages:</p>
 <ul>
 <% for (const r of site.repos) { %>
-  <li><a href="<%= url(r.index) %>"><%= r.name %></a>: <%= r.pages.filter(p => !p.synthetic).length %> pages</li>
+  <li><a href="<%= url(r.index) %>"><%= r.name %></a>: <%= r.docPages.length %> doc pages, <%= r.apis.length %> code references</li>
 <% } %>
 </ul>
 <%- md('Rendered by `md()` from **markdown** inside a template.') %>

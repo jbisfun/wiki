@@ -1,6 +1,9 @@
-// markdown-it configured for docs from many repos: anchors, {#id} attrs,
-// highlight.js at build time (no client JS), and link rewriting so that
-// .md links become pages and links leaving docs/ point at GitHub.
+/**
+ * markdown-it configured for docs from many repos: anchors, {#id} attrs,
+ * highlight.js at build time (no client JS), and link rewriting so that
+ * .md links become pages and links to other repo files point at GitHub.
+ * @module markdown
+ */
 import MarkdownIt from "markdown-it";
 import anchor from "markdown-it-anchor";
 import attrs from "markdown-it-attrs";
@@ -9,6 +12,13 @@ import hljs from "highlight.js";
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:|^\/\/|^#/i;
 
+/**
+ * Create the markdown-it instance used for every page.
+ * @param {object} options
+ * @param {function(string, object, object): string} options.resolveLink
+ *   Rewrites relative links (link, env, token); `env` is the render env ({repo, base, from}).
+ * @returns {MarkdownIt}
+ */
 export function createMarkdown({ resolveLink }) {
   const md = new MarkdownIt({
     html: true,
@@ -36,9 +46,14 @@ export function createMarkdown({ resolveLink }) {
   return md;
 }
 
-// mdBook preprocessor commands used by the zed docs: {#kb action} / {#action action}.
-// Emitted as markdown code spans: inline HTML would be re-serialized tag by
-// tag by replace-link's processHTML and lose its closing tags.
+/**
+ * Replace the mdBook preprocessor commands used by the zed docs
+ * (`{#kb action}` / `{#action action}`) with code spans.
+ * Code spans, not inline HTML: replace-link's processHTML re-serializes
+ * HTML tag by tag and would lose the closing tags.
+ * @param {string} source markdown
+ * @returns {string}
+ */
 export function preprocess(source) {
   return source.replace(/\{#(?:kb|action)\s+([^}]+)\}/g, (_, action) => `\`${action.trim()}\``);
 }
