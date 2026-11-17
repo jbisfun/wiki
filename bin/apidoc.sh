@@ -70,11 +70,12 @@ js() {
   mapfile -t files < <(files_for "$path" "$cfg" '*.js' '*.mjs')
   ((${#files[@]})) || return 0
   (cd "$path" && grep -qF '/**' -- "${files[@]}") || return 0
+  # jsdoc.json drops the generation date, so unchanged code gives unchanged pages.
   local jsdoc="$wiki/node_modules/.bin/jsdoc"
   [[ -x $jsdoc ]] || { warn "$name: jsdoc not installed (just install), skipping"; return 0; }
   rm -rf "$dest" && mkdir -p "$(dirname "$dest")"
   local log
-  log="$(cd "$path" && "$jsdoc" -d "$dest" "${files[@]}" 2>&1)" || { warn "$name: jsdoc failed"; echo "$log" >&2; return 0; }
+  log="$(cd "$path" && "$jsdoc" -c "$wiki/jsdoc.json" -d "$dest" "${files[@]}" 2>&1)" || { warn "$name: jsdoc failed"; echo "$log" >&2; return 0; }
   entry "$name" js "$name" "js/index.html"
 }
 
