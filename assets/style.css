@@ -1,5 +1,6 @@
 @import "npm:bootstrap/dist/css/bootstrap.css";
-@import "npm:highlight.js/styles/github.css";
+@import "npm:highlight.js/styles/github.css" (prefers-color-scheme: light);
+@import "npm:highlight.js/styles/github-dark.css" (prefers-color-scheme: dark);
 
 .wiki-sidebar {
   position: sticky;

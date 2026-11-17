@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ask pull for the workspace repos and print a JSON manifest of every cloned
-# one: [{name, path, branch, head, web, readme, docs, config}], where config
-# is the repo's table from wiki.toml.
+# one, sorted by name: [{name, path, branch, head, web, readme, docs, config}],
+# where config is the repo's table from wiki.toml.
 set -euo pipefail
 
 wiki="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,4 +31,4 @@ pull status --json |
         readme: (if $readme == "" then null else $readme end),
         docs: $docs, config: ($config[$name] // {})}'
   done |
-  jq -s --arg root "$root" '{root: $root, repos: .}'
+  jq -s --arg root "$root" '{root: $root, repos: sort_by(.name | ascii_downcase)}'
