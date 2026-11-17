@@ -1,0 +1,32 @@
+---
+title: Templating
+---
+<h1>Templating</h1>
+<p>Any <code>.ejs</code> file in a repo's <code>docs/</code> (or in <code>wiki/pages/</code>) is a page, rendered like a PHP file: HTML with embedded code. This page is <code>wiki/docs/templating.ejs</code>.</p>
+
+<h2>Tags</h2>
+<table class="table table-sm">
+  <tr><td><code>&lt;% code %&gt;</code></td><td>run JavaScript (loops, ifs)</td></tr>
+  <tr><td><code>&lt;%= value %&gt;</code></td><td>print, HTML-escaped</td></tr>
+  <tr><td><code>&lt;%- html %&gt;</code></td><td>print raw HTML</td></tr>
+  <tr><td><code>&lt;%- include('partials/footer') %&gt;</code></td><td>include a template from <code>wiki/templates</code> or a relative path</td></tr>
+</table>
+
+<h2>Variables</h2>
+<ul>
+  <li><code>site</code>: <code>title</code>, <code>repos</code>, <code>pages</code></li>
+  <li><code>repo</code>: the current repo (<code>name</code>, <code>pages</code>, <code>web</code>, <code>head</code>, ...)</li>
+  <li><code>page</code>: <code>title</code>, <code>out</code>, front matter as <code>page.data</code></li>
+  <li><code>url(path)</code>: site-relative path to a link from this page</li>
+  <li><code>md(source)</code>: render markdown</li>
+</ul>
+<p>Front matter <code>layout: false</code> skips <code>templates/layout.ejs</code>; <code>layout: other.ejs</code> picks another one. Markdown pages can opt in to EJS with <code>ejs: true</code>.</p>
+
+<h2>Live example</h2>
+<p>This workspace has <%= site.repos.length %> documented repos and <%= site.pages.length %> pages:</p>
+<ul>
+<% for (const r of site.repos) { %>
+  <li><a href="<%= url(r.index) %>"><%= r.name %></a>: <%= r.pages.filter(p => !p.synthetic).length %> pages</li>
+<% } %>
+</ul>
+<%- md('Rendered by `md()` from **markdown** inside a template.') %>

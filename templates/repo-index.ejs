@@ -1,0 +1,5 @@
+<h1><%= repo.title %></h1>
+<p class="lead">
+  <%= repo.pages.length - 1 %> pages from <code><%= repo.name %>/docs</code><% if (repo.web) { %> in <a href="<%= repo.web %>"><%= repo.web.replace('https://', '') %></a><% } %>.
+</p>
+<%- sidebar() %>

@@ -1,0 +1,17 @@
+---
+title: jbisfun wiki
+---
+<h1 class="mb-3"><%= site.title %></h1>
+<p class="lead">Documentation from every repo in the <a href="https://github.com/jbisfun/pull">pull</a> workspace, built from each repo's <code>docs/</code> folder.</p>
+<div class="row row-cols-1 row-cols-md-2 g-3">
+<% for (const r of site.repos) { %>
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5 card-title"><a class="stretched-link text-decoration-none" href="<%= url(r.index) %>"><%= r.title %></a></h2>
+        <p class="card-text text-body-secondary mb-0"><%= r.pages.filter(p => !p.synthetic).length %> pages · <code><%= r.name %></code> @ <%= (r.head ?? '').slice(0, 7) %></p>
+      </div>
+    </div>
+  </div>
+<% } %>
+</div>

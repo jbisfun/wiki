@@ -1,0 +1,33 @@
+{
+  "name": "wiki",
+  "version": "1.0.0",
+  "description": "Static wiki built from the docs/ of every pull workspace repo",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.21.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.21.0",
+  "type": "module",
+  "dependencies": {
+    "bootstrap": "^5.3.9",
+    "ejs": "^7.0.2",
+    "gray-matter": "^4.0.3",
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^15.0.3",
+    "markdown-it-anchor": "^10.1.0",
+    "markdown-it-attrs": "^5.0.1",
+    "markdown-it-replace-link": "^1.2.2",
+    "smol-toml": "^1.9.1",
+    "tinyglobby": "^0.2.17"
+  },
+  "devDependencies": {
+    "parcel": "^2.16.4"
+  },
+  "private": true
+}

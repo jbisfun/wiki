@@ -1,0 +1,12 @@
+<ul class="list-unstyled wiki-tree">
+<% for (const child of node.children.values()) { %>
+  <li>
+<% if (child.page) { %>
+    <a href="<%= url(child.page.out) %>"><%= child.page.title %></a>
+<% } else { %>
+    <span class="fw-semibold"><%= child.name %></span>
+<% } %>
+<% if (child.children.size) { %><%- include('tree', { node: child, url }) %><% } %>
+  </li>
+<% } %>
+</ul>
