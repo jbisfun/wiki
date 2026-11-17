@@ -159,8 +159,11 @@ async function main() {
       if (docRel === "SUMMARY.md") continue;
       const src = path.join(repo.path, rel);
       if (rel.endsWith(".md") || rel.endsWith(".ejs")) {
-        const { data, content } = frontMatter(await readFile(src, "utf8"));
-        const page = { repo, rel, docRel, src, out, data, body: content, title: titleOf(data, content, rel), readme: rel === repo.readme };
+        const source = await readFile(src, "utf8");
+        const { data, content } = frontMatter(source);
+        // Source lines above the body (front matter), so rendered blocks map to file lines.
+        const lineOffset = source.slice(0, source.lastIndexOf(content)).split("\n").length - 1;
+        const page = { repo, rel, docRel, src, out, data, body: content, lineOffset, title: titleOf(data, content, rel), readme: rel === repo.readme };
         repo.pages.push(page);
         pages.push(page);
       } else {
@@ -228,7 +231,7 @@ async function main() {
 
   for (const page of pages) {
     const from = page.out;
-    const env = { repo: page.repo, base: posix.dirname(page.rel || "."), from };
+    const env = { repo: page.repo, base: posix.dirname(page.rel || "."), from, lineOffset: page.lineOffset ?? 0 };
     const data = {
       site,
       page,

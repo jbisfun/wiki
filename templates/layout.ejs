@@ -23,7 +23,7 @@
     <nav class="col-lg-3 col-xl-2 wiki-sidebar collapse d-lg-block border-end py-3" id="sidebar">
       <%- sidebar() %>
     </nav>
-    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content">
+    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content"<% if (page.rel && page.rel.endsWith('.md') && !page.data.ejs) { %> data-radar-repo="<%= repo.name %>" data-radar-file="<%= page.rel %>"<% } %>>
 <% } else { %>
     <main class="col-lg-10 col-xl-8 mx-auto py-4 wiki-content">
 <% } %>
@@ -32,5 +32,6 @@
     </main>
   </div>
 </div>
+<% if (page.rel && page.rel.endsWith('.md') && !page.data.ejs) { %><%- include('partials/radar') %><% } %>
 </body>
 </html>

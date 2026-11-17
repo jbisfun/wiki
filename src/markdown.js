@@ -41,6 +41,13 @@ export function createMarkdown({ resolveLink }) {
       return resolveLink(link, env, token);
     },
   });
+  // data-line = 1-based source line of each block (fences: the ``` line), for Radar.
+  md.core.ruler.push("source_lines", (state) => {
+    const offset = state.env?.lineOffset ?? 0;
+    for (const token of state.tokens) {
+      if (token.block && token.map && token.nesting !== -1) token.attrSet("data-line", String(token.map[0] + 1 + offset));
+    }
+  });
   // Bootstrap look for plain markdown tables.
   md.renderer.rules.table_open = () => '<table class="table table-sm table-striped">\n';
   return md;
