@@ -4,6 +4,7 @@
 #
 #   skip = true                         leave the repo out of the wiki
 #   category = "..."                    group label for the header's dropdowns (default "Other")
+#   description = "..."                 one line for the home page (default: first sentence of the README)
 #   rust = false | { packages = [..] }  cargo doc --no-deps (default: default-members)
 #   lua  = false | { files = [..] }     LDoc (default: tracked *.lua except *.x.lua hooks)
 #   js   = false | { files = [..] }     JSDoc (default: tracked *.js/*.mjs, needs package.json)
@@ -15,63 +16,83 @@ skip = true # the published site itself
 skip = true # upstream reference clone
 
 [repos.ycode]
+description = "A Zed fork you can script in Lua."
 category = "ycode"
 # The whole Zed workspace is ~250 crates; document the ycode-specific ones.
 rust = { packages = ["lua_hooks"] }
 
 [repos.ycode-hermes]
+description = "Hermes Agent as ycode's agent, over ACP."
 category = "ycode"
 
 [repos.ycode-idl]
+description = "An idl panel for building and installing iOS apps from ycode."
 category = "ycode"
 
 [repos.ycode-manager]
+description = "Turns ycode's Lua mods on and off."
 category = "ycode"
 
 [repos.ycode-offline]
+description = "Turns off ycode's account and online features."
 category = "ycode"
 
 [repos.ycode-pull]
+description = "pull's changes, commit box and jobs as ycode panels."
 category = "ycode"
 
 [repos.apple-codesign]
+description = "Apple code signing in pure Rust."
 category = "Apple platform"
 
 [repos.AppStoreAuth]
+description = "On-device App Store sign-in for iOS, split out of LiveContainer."
 category = "Apple platform"
 
 [repos.FairplayedKit]
+description = "FairPlay IPA decryption on device, split out of LiveContainer."
 category = "Apple platform"
 
 [repos.idl]
+description = "Builds iOS apps on Linux from one idlproj.yml."
 category = "Apple platform"
 
 [repos."ios-webusb"]
+description = "An iPhone/iPad driver that runs in the browser over WebUSB."
 category = "Apple platform"
 
 [repos.MacADICore]
+description = "Mac CoreADI emulated on iOS, for anisette headers."
 category = "Apple platform"
 
 [repos.omnisette]
+description = "Generates the anisette data Apple sign-in needs."
 category = "Apple platform"
 
 [repos.xkit]
+description = "Apple developer sign-in, provisioning, signing and install, in Rust."
 category = "Apple platform"
 
 [repos.dotenv]
+description = "The workspace pullfile, copied here on every commit."
 category = "Workspace tools"
 
 [repos.issues]
+description = "Open radar reports for this workspace."
 category = "Workspace tools"
 
 [repos.pull]
+description = "One commit, sync and push across every repo in the workspace."
 category = "Workspace tools"
 
 [repos.radar]
+description = "Files reports against lines of code, for agents and people."
 category = "Workspace tools"
 
 [repos.tool]
+description = "Per-project Homebrew packages, declared in the pullfile."
 category = "Workspace tools"
 
 [repos.wiki]
+description = "Builds this site from every repo in the workspace."
 category = "Workspace tools"

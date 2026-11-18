@@ -17,6 +17,16 @@
 .wiki-sidebar a.active { color: var(--bs-link-color); font-weight: 600; }
 
 .wiki-content { max-width: 60rem; }
+.wiki-content.wiki-wide { max-width: 84rem; }
+
+/* The header embedded in rustdoc/LDoc pages lives in a shadow root (see
+   partials/apidoc-header.html), so these rules only reach it, never the doc page. */
+.wiki-shadow {
+  font-family: var(--bs-body-font-family);
+  font-size: var(--bs-body-font-size);
+  line-height: var(--bs-body-line-height);
+  color: var(--bs-body-color);
+}
 .wiki-content pre { background: var(--bs-tertiary-bg); padding: 0.75rem 1rem; border-radius: var(--bs-border-radius); }
 .wiki-content blockquote { border-left: 0.25rem solid var(--bs-border-color); padding-left: 1rem; color: var(--bs-secondary-color); }
 .wiki-content img { max-width: 100%; height: auto; }

@@ -2,9 +2,8 @@
 title: jbisfun wiki
 ---
 <h1 class="mb-3">{{ site.title }}</h1>
-<p class="lead">A living index of this workspace: every repo's README, its <code>docs/</code> folder, and API reference generated automatically by rustdoc, LDoc and JSDoc.</p>
-{% set cols = [4, [2, (site.repos | length // 6) + 1] | max] | min %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-{{ cols }} g-3">
+<p class="lead">READMEs, docs and API references for every repo in the workspace.</p>
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
 {% for r in site.repos %}
   <div class="col">
     <div class="card h-100">

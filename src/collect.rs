@@ -17,6 +17,8 @@ pub struct RepoConfig {
     pub skip: bool,
     /// Group label for the wiki header's dropdowns; repos without one land under "Other".
     pub category: Option<String>,
+    /// One line for the home page; defaults to the README's first sentence.
+    pub description: Option<String>,
     pub rust: Tool,
     pub lua: Tool,
     pub js: Tool,

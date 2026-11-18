@@ -56,25 +56,31 @@ impl Markdown {
     }
 
     /// Plain text of the first paragraph with text (not just badges), for the home page cards.
-    pub fn first_paragraph(&self, source: &str) -> Option<String> {
+    /// The first sentence of the first paragraph, as plain text (link and
+    /// emphasis text kept, markup dropped).
+    pub fn first_sentence(&self, source: &str) -> Option<String> {
         let arena = Arena::new();
         let root = parse_document(&arena, &preprocess(source), &self.options);
-        root.descendants().find_map(|node| {
-            if !matches!(node.data().value, NodeValue::Paragraph) {
-                return None;
+        let paragraph = root
+            .descendants()
+            .find(|node| matches!(node.data().value, NodeValue::Paragraph))?;
+        let mut text = String::new();
+        for node in paragraph.descendants() {
+            match &node.data().value {
+                NodeValue::Text(t) => text.push_str(t),
+                NodeValue::Code(code) => text.push_str(&code.literal),
+                NodeValue::SoftBreak | NodeValue::LineBreak => text.push(' '),
+                _ => {}
             }
-            let text: String = node
-                .children()
-                .map(|child| match &child.data().value {
-                    NodeValue::Text(text) => text.to_string(),
-                    NodeValue::Code(code) => code.literal.clone(),
-                    NodeValue::SoftBreak => " ".into(),
-                    _ => String::new(),
-                })
-                .collect();
-            let text = text.trim();
-            (!text.is_empty()).then(|| text.to_owned())
-        })
+        }
+        let text = text.trim();
+        let end = text
+            .match_indices(". ")
+            .map(|(at, _)| at + 1)
+            .next()
+            .unwrap_or(text.len());
+        let sentence = text[..end].trim();
+        (!sentence.is_empty()).then(|| sentence.to_owned())
     }
 }
 

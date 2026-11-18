@@ -454,7 +454,7 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
                 blob: site.links.blob.clone(),
                 head: repo.head.clone(),
                 category: repo.config.category.clone().unwrap_or_else(|| "Other".into()),
-                description: readme.and_then(|at| markdown.first_paragraph(&pages[*at].body)),
+                description: repo.config.description.clone().or_else(|| readme.and_then(|at| markdown.first_sentence(&pages[*at].body))),
                 readme_page: readme.map(page_ref),
                 doc_pages: docs.iter().map(|(_, page)| page.clone()).collect(),
                 tree: TreeNode::build(&docs),
@@ -543,9 +543,10 @@ struct Renderer<'a> {
 
 impl Renderer<'_> {
     /// Every `.html` file under `dir` (a freshly copied rustdoc/LDoc output tree) gets
-    /// the site's own navbar spliced in after `<body>`, plus the site stylesheet and
-    /// script linked into `<head>`, so these pages match the rest of the wiki instead
-    /// of standing apart in the doc tool's bare look.
+    /// the site header (partials/apidoc-header.html) spliced in after `<body>`. The
+    /// header is a fixed element whose content lives in a shadow root, so the site's
+    /// stylesheet styles it without touching the doc tool's own CSS; the only thing
+    /// added to the page itself is room at the top for the header.
     fn embed_headers(&self, dir: &Path, dist: &Path, repo_index: usize) -> Result<()> {
         for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
             if !entry.file_type().is_file() {
@@ -570,20 +571,25 @@ impl Renderer<'_> {
             let from = from.to_owned();
             Value::from_function(move |to: String| url(&from, &to))
         };
-        let header = self.env.get_template("partials/navbar.html")?.render(context! {
+        let header = self.env.get_template("partials/apidoc-header.html")?.render(context! {
             site => self.site.clone(),
             repo => Value::from(Serde(&self.views[repo_index])),
             url => url_value,
         })?;
-        let mut out = String::with_capacity(html.len() + header.len() + 200);
+        // header.js measures the header into --wiki-header-height. rustdoc's sidebar is
+        // sticky at the top of the viewport, so it moves down by the same amount.
+        let head = format!(
+            "  <script type=\"module\" src=\"{}\"></script>\n  <style>\
+             body{{padding-top:var(--wiki-header-height,3.5rem)!important}}\
+             .rustdoc .sidebar{{top:var(--wiki-header-height,3.5rem);height:calc(100vh - var(--wiki-header-height,3.5rem))}}\
+             </style>\n",
+            url(from, "_assets/main.js"),
+        );
+        let mut out = String::with_capacity(html.len() + header.len() + head.len());
         match HEAD_TAG.find(&html) {
             Some(found) => {
                 out.push_str(&html[..found.start()]);
-                out.push_str(&format!(
-                    "  <link rel=\"stylesheet\" href=\"{}\">\n  <script type=\"module\" src=\"{}\"></script>\n",
-                    url(from, "_assets/style.css"),
-                    url(from, "_assets/main.js"),
-                ));
+                out.push_str(&head);
                 out.push_str(&html[found.start()..body_end]);
             }
             None => out.push_str(&html[..body_end]),
