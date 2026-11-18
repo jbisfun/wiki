@@ -8,19 +8,34 @@
 
 ## How it works
 
-1. `bin/collect.sh` runs `pull status --json` and, with `jq`, writes a manifest of every cloned repo (README, `docs/`, GitHub URL) merged with its table from `wiki.toml`.
-2. `bin/apidoc.sh` generates the code reference into `.build/api/<repo>/`:
-   - Rust: `cargo doc --no-deps` (rustdoc) when the repo has a `Cargo.toml`, using the repo's own target dir. Binary crates include private items.
+`wiki build` (a Rust binary, `src/`) runs these steps:
+
+1. **Collect** (`collect.rs`): runs `pull status --json` and keeps every cloned repo, with its README, its GitHub URL (from the `origin` remote) and its table from `wiki.toml`.
+2. **Code reference** (`apidoc.rs`), into `.build/api/<repo>/<tool>/`:
+   - Rust: `cargo doc --no-deps` (rustdoc) when the repo has a `Cargo.toml`, using the repo's own target dir.
    - Lua: [LDoc](https://github.com/lunarmodules/ldoc) (`apt install lua-ldoc`) over tracked `*.lua` files, except `*.x.lua` hook scripts. Only `---` doc comments are picked up (`-- @module name` on the file's first one).
    - JavaScript: [JSDoc](https://jsdoc.app) (a wiki dev dependency) over tracked `*.js`/`*.mjs` in repos with a `package.json` and `/** */` comments.
    A missing tool or a failing run only warns, so the site still builds.
-3. `src/render.js` renders each page into `.build/site/<repo>/...`. mdBook projects (a `docs/book.toml`) use the book's `src` folder and its `SUMMARY.md` as the docs sidebar.
-   - `*.md` with [markdown-it](https://github.com/markdown-it/markdown-it) (front matter via gray-matter, `{#id}` heading attributes, highlight.js at build time).
-   - `*.ejs` with [EJS](https://ejs.co): PHP-style `<% code %>` / `<%= escaped %>` / `<%- raw %>` tags.
+3. **Assets** (`bundle.rs`): an embedded [rolldown](https://rolldown.rs) bundles and minifies `assets/main.js` with its npm imports (Bootstrap's collapse and dropdown, clipboard.js). [lightningcss](https://lightningcss.dev) bundles `assets/style.css` with Bootstrap's CSS, plus the code highlighting CSS that syntect generates from its light and dark themes. Output goes to `dist/_assets`.
+4. **Render** (`render.rs`) into `dist/<repo>/...`. mdBook projects (a `docs/book.toml`) use the book's `src` folder and its `SUMMARY.md` as the docs sidebar.
+   - `*.md` with [comrak](https://github.com/kivikakk/comrak): GFM tables and autolinks, smart punctuation, `{#id}` heading attributes, and highlighting by syntect at build time. Every block carries `data-sourcepos`, so Radar can map a selection back to its source line.
+   - `*.jinja` with [minijinja](https://github.com/mitsuhiko/minijinja). See [Templating](templating.jinja).
    - Every other file in `docs/` is copied as an asset.
-   - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL).
-4. [Parcel](https://parceljs.org) bundles Bootstrap 5 and the one small JS module (mobile sidebar toggle) into `dist/_assets`.
-5. `bin/publish.sh` mirrors `dist/` into the `jbisfun.github.io` repo with rsync and stages it.
+   - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL). Links are rewritten with lol_html, so links in raw HTML are covered too.
+5. **Publish** (`wiki publish`): mirrors `dist/` into the `jbisfun.github.io` repo with rsync and stages it.
+
+## What gets regenerated
+
+Inputs are identified the way git identifies them (`state.rs`), and `.build/state.json` keeps the key each piece was last built with:
+
+| Piece | Rebuilt when this changes |
+| - | - |
+| A repo's code reference | the repo's HEAD tree id, the patch id of its uncommitted changes, or its `wiki.toml` settings |
+| A repo's pages | the blob id of any of its page sources, its code reference keys, or the global key |
+| Everything | the global key: blob ids of `templates/`, the list of repos in the navbar, the site title, or the `wiki` binary |
+| `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `wiki` binary |
+
+`.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `wiki build --force` (`just rebuild`) ignores the state.
 
 ## wiki.toml
 
@@ -33,16 +48,14 @@ skip = true                            # leave the repo out
 [repos.ycode]
 rust = { packages = ["lua_hooks"] }    # cargo doc -p ... (default: default-members)
 
-[repos.wiki]
-js = { files = ["src"] }               # pathspecs (default: all tracked *.js/*.mjs)
-# lua = { files = ["lib"] }  /  rust = false  /  js = false
+# lua = { files = ["lib"] }  /  js = { files = ["src"] }  /  rust = false
 ```
 
 ## Commands
 
 ```sh
-just build     # pnpm install, collect, apidoc, render, bundle into dist/
-just apidoc    # only the code reference (.build/api, .build/api.json)
+just build     # pnpm install, then wiki build into dist/
+just rebuild   # the same, ignoring .build/state.json
 just publish   # build, then copy into ../jbisfun.github.io and git add
 just serve     # build and serve dist/ on http://localhost:8000
 just clean
@@ -54,4 +67,4 @@ Environment: `PULL_ROOT` (workspace root, default `..`), `WIKI_SKIP` (comma-sepa
 
 The workspace `pullfile.plist` runs `just publish` as a `precommit` hook, so `pull commit` lands the regenerated site in `jbisfun.github.io` in the same commit and `pull push` deploys it to GitHub Pages.
 
-See [Templating](templating.md) for writing pages.
+See [Templating](templating.jinja) for writing pages.

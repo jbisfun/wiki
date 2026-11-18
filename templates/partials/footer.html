@@ -1,0 +1,6 @@
+<footer class="border-top mt-5 pt-3 small text-body-secondary">
+{% if repo and page.rel and repo.blob %}
+  <a href="{{ repo.blob }}{{ page.rel }}">View source on GitHub</a> ·
+{% endif %}
+  Built by <a href="https://github.com/jbisfun/wiki">jbisfun/wiki</a>
+</footer>

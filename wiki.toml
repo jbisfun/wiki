@@ -16,6 +16,3 @@ skip = true # upstream reference clone
 [repos.ycode]
 # The whole Zed workspace is ~250 crates; document the ycode-specific ones.
 rust = { packages = ["lua_hooks"] }
-
-[repos.wiki]
-js = { files = ["src"] }

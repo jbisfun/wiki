@@ -1,6 +1,5 @@
-@import "npm:bootstrap/dist/css/bootstrap.css";
-@import "npm:highlight.js/styles/github.css" (prefers-color-scheme: light);
-@import "npm:highlight.js/styles/github-dark.css" (prefers-color-scheme: dark);
+/* Bundled by lightningcss; the code highlighting CSS is generated from syntect themes. */
+@import "../node_modules/bootstrap/dist/css/bootstrap.css";
 
 .wiki-sidebar {
   position: sticky;
@@ -22,6 +21,6 @@
 .wiki-content blockquote { border-left: 0.25rem solid var(--bs-border-color); padding-left: 1rem; color: var(--bs-secondary-color); }
 .wiki-content img { max-width: 100%; height: auto; }
 .wiki-content h2, .wiki-content h3 { margin-top: 2rem; }
-.wiki-content .header-anchor { text-decoration: none; }
-.wiki-content .header-anchor { color: inherit; }
-.wiki-content .header-anchor:hover { color: var(--bs-link-color); }
+.wiki-content .anchor { text-decoration: none; margin-left: 0.4rem; visibility: hidden; }
+.wiki-content .anchor::before { content: "#"; }
+.wiki-content :is(h1, h2, h3, h4, h5, h6):hover .anchor { visibility: visible; }

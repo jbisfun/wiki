@@ -1,0 +1,32 @@
+---
+title: Templating
+---
+<h1>Templating</h1>
+<p>Any <code>.jinja</code> file in a repo's <code>docs/</code> (or in <code>wiki/pages/</code>) is a page, rendered with <a href="https://github.com/mitsuhiko/minijinja">minijinja</a> (Jinja2 syntax). This page is <code>wiki/docs/templating.jinja</code>. Layouts and partials live in <code>wiki/templates</code>.</p>
+
+<h2>Tags</h2>
+<table class="table table-sm">
+  <tr><td><code>{% raw %}{% for x in xs %}{% endfor %}{% endraw %}</code></td><td>statements (loops, ifs, <code>set</code>)</td></tr>
+  <tr><td><code>{% raw %}{{ value }}{% endraw %}</code></td><td>print, HTML-escaped</td></tr>
+  <tr><td><code>{% raw %}{{ html | safe }}{% endraw %}</code></td><td>print raw HTML</td></tr>
+  <tr><td><code>{% raw %}{% include "partials/footer.html" %}{% endraw %}</code></td><td>include a template from <code>wiki/templates</code></td></tr>
+</table>
+
+<h2>Variables</h2>
+<ul>
+  <li><code>site</code>: <code>title</code>, <code>repos</code>, <code>pages</code> (<code>{title, out}</code>)</li>
+  <li><code>repo</code>: the current repo (<code>name</code>, <code>index</code>, <code>readme_page</code>, <code>doc_pages</code>, <code>apis</code> (<code>{tool, title, label, out}</code>), <code>description</code>, <code>web</code>, <code>head</code>, ...)</li>
+  <li><code>page</code>: <code>title</code>, <code>out</code>, <code>rel</code>, front matter as <code>page.data</code></li>
+  <li><code>url(path)</code>: site-relative path to a link from this page</li>
+  <li><code>md(source)</code>: render markdown</li>
+</ul>
+<p>Front matter <code>layout: false</code> skips <code>templates/layout.html</code>; <code>layout: other.html</code> picks another one. Markdown pages can opt in to Jinja with <code>jinja: true</code>. Template pages are rendered on every build, since they can show anything about the site.</p>
+
+<h2>Live example</h2>
+<p>This workspace has {{ site.repos | length }} repos and {{ site.pages | length }} pages:</p>
+<ul>
+{% for r in site.repos %}
+  <li><a href="{{ url(r.index) }}">{{ r.name }}</a>: {{ r.doc_pages | length }} doc pages, {{ r.apis | length }} code references</li>
+{% endfor %}
+</ul>
+{{ md('Rendered by `md()` from **markdown** inside a template.') }}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= page.title %><% if (page.title !== site.title) { %> · <%= site.title %><% } %></title>
+  <title>{{ page.title }}{% if page.title != site.title %} · {{ site.title }}{% endif %}</title>
   <meta name="color-scheme" content="light dark">
   <script>
     // Follow the system light/dark preference; inline so the page never flashes the wrong theme.
@@ -12,26 +12,26 @@
     applyScheme();
     scheme.addEventListener("change", applyScheme);
   </script>
-  <link rel="stylesheet" href="<%= url('_assets/style.css') %>">
-  <script type="module" src="<%= url('_assets/main.js') %>"></script>
+  <link rel="stylesheet" href="{{ url('_assets/style.css') }}">
+  <script type="module" src="{{ url('_assets/main.js') }}"></script>
 </head>
 <body>
-<%- include('partials/navbar') %>
+{% include "partials/navbar.html" %}
 <div class="container-fluid">
   <div class="row">
-<% if (repo) { %>
+{% if repo %}
     <nav class="col-lg-3 col-xl-2 wiki-sidebar collapse d-lg-block border-end py-3" id="sidebar">
-      <%- sidebar() %>
+      {{ sidebar }}
     </nav>
-    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content"<% if (page.rel && page.rel.endsWith('.md') && !page.data.ejs) { %> data-radar-repo="<%= repo.name %>" data-radar-file="<%= page.rel %>"<% } %>>
-<% } else { %>
+    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content"{% if page.radar %} data-radar-repo="{{ repo.name }}" data-radar-file="{{ page.rel }}"{% endif %}>
+{% else %}
     <main class="col-lg-10 col-xl-8 mx-auto py-4 wiki-content">
-<% } %>
-      <%- content %>
-<%- include('partials/footer') %>
+{% endif %}
+      {{ content }}
+{% include "partials/footer.html" %}
     </main>
   </div>
 </div>
-<% if (page.rel && page.rel.endsWith('.md') && !page.data.ejs) { %><%- include('partials/radar') %><% } %>
+{% if page.radar %}{% include "partials/radar.html" %}{% endif %}
 </body>
 </html>

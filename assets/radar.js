@@ -1,6 +1,7 @@
 // Radar: select text on a docs page, right-click, and copy the `radar add` command
-// that files it. Blocks carry data-line (markdown.js); <main> carries the repo and
-// file and the menu markup is partials/radar.ejs.
+// that files it. Rendered markdown carries data-sourcepos ("line:col-line:col",
+// src/markdown.rs); <main> carries the repo and file and the menu markup is
+// templates/partials/radar.html.
 import Dropdown from "bootstrap/js/dist/dropdown";
 import ClipboardJS from "clipboard";
 
@@ -15,17 +16,17 @@ if (radar) {
     popperConfig: { strategy: "fixed" },
   });
 
-  // Line of the selection start: the block's line plus the breaks before it
-  // (a fence's <code> starts one line after its ``` line).
+  // Line of the selection start: the element's start line plus the breaks before it
+  // (a fenced block's code starts one line after its ``` line).
   const sourceLine = (range) => {
     const node = range.startContainer;
-    const block = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest("[data-line]");
+    const block = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest("[data-sourcepos]");
     if (!block) return null;
     const before = document.createRange();
     before.setStart(block, 0);
     before.setEnd(node, range.startOffset);
-    const fence = block.matches("pre > code") ? 1 : 0;
-    return Number(block.dataset.line) + fence + before.toString().split("\n").length - 1;
+    const fence = block.matches("pre") ? 1 : 0;
+    return parseInt(block.dataset.sourcepos, 10) + fence + before.toString().split("\n").length - 1;
   };
 
   document.addEventListener("contextmenu", (event) => {

@@ -1,15 +1,15 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-semibold" href="<%= url('index.html') %>"><%= site.title %></a>
+    <a class="navbar-brand fw-semibold" href="{{ url('index.html') }}">{{ site.title }}</a>
     <ul class="navbar-nav flex-row flex-wrap gap-3 ms-lg-3 me-auto">
-<% for (const r of site.repos) { %>
-      <li class="nav-item"><a class="nav-link<%= repo === r ? ' active' : '' %>" href="<%= url(r.index) %>"><%= r.name %></a></li>
-<% } %>
+{% for r in site.repos %}
+      <li class="nav-item"><a class="nav-link{% if repo and repo.name == r.name %} active{% endif %}" href="{{ url(r.index) }}">{{ r.name }}</a></li>
+{% endfor %}
     </ul>
-<% if (repo) { %>
+{% if repo %}
     <button class="navbar-toggler ms-3" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle pages">
       <span class="navbar-toggler-icon"></span>
     </button>
-<% } %>
+{% endif %}
   </div>
 </nav>

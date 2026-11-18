@@ -1,0 +1,27 @@
+<ul class="list-unstyled">
+{% if repo.readme_page %}
+  <li><a href="{{ url(repo.index) }}">README</a></li>
+{% endif %}
+{% if repo.web %}
+  <li><a href="{{ repo.web }}">Source on GitHub</a></li>
+{% endif %}
+</ul>
+{% if repo.apis %}
+<h1>Code reference</h1>
+<ul class="list-unstyled">
+{% for a in repo.apis %}
+  <li><a href="{{ url(a.out) }}">{{ a.title }}</a> <span class="badge text-bg-secondary">{{ a.label }}</span></li>
+{% endfor %}
+</ul>
+{% endif %}
+{% if repo.doc_pages %}
+<h1>{{ repo.book_title or 'Docs' }}</h1>
+{% if summary %}
+{{ summary }}
+{% else %}
+{% if repo.tree.page %}
+<ul class="list-unstyled"><li><a href="{{ url(repo.tree.page.out) }}">{{ repo.tree.page.title }}</a></li></ul>
+{% endif %}
+{% include "partials/tree.html" %}
+{% endif %}
+{% endif %}

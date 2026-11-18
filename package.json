@@ -1,7 +1,7 @@
 {
   "name": "wiki",
   "version": "1.0.0",
-  "description": "Static wiki built from the docs/ of every pull workspace repo",
+  "description": "Client assets (bundled by the wiki's embedded rolldown) and JSDoc for the wiki",
   "keywords": [],
   "author": "",
   "license": "MIT",
@@ -17,20 +17,10 @@
   "dependencies": {
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.9",
-    "clipboard": "^2.0.11",
-    "ejs": "^7.0.2",
-    "gray-matter": "^4.0.3",
-    "highlight.js": "^11.12.0",
-    "markdown-it": "^15.0.3",
-    "markdown-it-anchor": "^10.1.0",
-    "markdown-it-attrs": "^5.0.1",
-    "markdown-it-replace-link": "^1.2.2",
-    "smol-toml": "^1.9.1",
-    "tinyglobby": "^0.2.17"
+    "clipboard": "^2.0.11"
   },
   "devDependencies": {
-    "jsdoc": "^4.0.5",
-    "parcel": "^2.16.4"
+    "jsdoc": "^4.0.5"
   },
   "private": true
 }

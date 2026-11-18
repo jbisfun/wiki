@@ -1,0 +1,12 @@
+<ul class="list-unstyled wiki-tree">
+{% for child in repo.tree.children recursive %}
+  <li>
+{% if child.page %}
+    <a href="{{ url(child.page.out) }}">{{ child.page.title }}</a>
+{% else %}
+    <span class="fw-semibold">{{ child.name }}</span>
+{% endif %}
+{% if child.children %}<ul class="list-unstyled wiki-tree">{{ loop(child.children) }}</ul>{% endif %}
+  </li>
+{% endfor %}
+</ul>
