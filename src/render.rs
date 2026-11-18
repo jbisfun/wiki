@@ -15,6 +15,7 @@ use minijinja::value::{Serde, Value};
 use minijinja::{AutoEscape, Environment, context, path_loader};
 use regex::Regex;
 use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::Paths;
 use crate::apidoc::{Api, copy_dir};
@@ -25,6 +26,7 @@ use crate::state::{self, State};
 static IMAGE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|gif|svg|webp|avif|ico)$").expect("valid regex"));
 static H1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^#\s+(.+?)\s*(\{#[^}]*\})?\s*$").expect("valid regex"));
 static FRONT_MATTER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^---\r?\n([\s\S]*?)\r?\n---\r?\n?").expect("valid regex"));
+static BODY_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<body[^>]*>").expect("valid regex"));
 
 /// Relative URL from one output page to another, both site-relative.
 pub fn url(from: &str, to: &str) -> String {
@@ -486,7 +488,13 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
             }
             let tools: std::collections::BTreeSet<&str> = site.apis.iter().map(|api| api.tool.as_str()).collect();
             for tool in tools {
-                copy_dir(&paths.build.join("api").join(name).join(tool), &dir.join("api").join(tool))?;
+                let dest = dir.join("api").join(tool);
+                copy_dir(&paths.build.join("api").join(name).join(tool), &dest)?;
+                // rustdoc/LDoc pages are standalone documents, not rendered through
+                // layout.html: embed a small header directly so they stay reachable.
+                if tool == "rust" || tool == "lua" {
+                    renderer.embed_headers(&dest, dist, index)?;
+                }
             }
         }
         for at in &site.pages {
@@ -530,6 +538,46 @@ struct Renderer<'a> {
 }
 
 impl Renderer<'_> {
+    /// Every `.html` file under `dir` (a freshly copied rustdoc/LDoc output tree) gets a
+    /// small, self-contained header spliced in after `<body>`: back to the repo and the
+    /// site root. Inline-styled (no site stylesheet) so it can't clash with the doc
+    /// tool's own CSS.
+    fn embed_headers(&self, dir: &Path, dist: &Path, repo_index: usize) -> Result<()> {
+        for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("html") {
+                continue;
+            }
+            let from = path.strip_prefix(dist)?.to_string_lossy().replace('\\', "/");
+            self.embed_header(path, &from, repo_index)?;
+        }
+        Ok(())
+    }
+
+    fn embed_header(&self, path: &Path, from: &str, repo_index: usize) -> Result<()> {
+        let html = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let Some(body_end) = BODY_TAG.find(&html).map(|found| found.end()) else {
+            return Ok(());
+        };
+        let url_value = {
+            let from = from.to_owned();
+            Value::from_function(move |to: String| url(&from, &to))
+        };
+        let header = self.env.get_template("partials/apidoc-header.html")?.render(context! {
+            site => self.site.clone(),
+            repo => Value::from(Serde(&self.views[repo_index])),
+            url => url_value,
+        })?;
+        let mut out = String::with_capacity(html.len() + header.len());
+        out.push_str(&html[..body_end]);
+        out.push_str(&header);
+        out.push_str(&html[body_end..]);
+        fs::write(path, out).with_context(|| format!("writing {}", path.display()))
+    }
+
     fn page(&self, page: &Page, repo: Option<usize>) -> Result<String> {
         let from = page.out.clone();
         let base = page.rel.rsplit_once('/').map_or(".", |(dir, _)| dir).to_owned();
