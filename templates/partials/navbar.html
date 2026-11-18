@@ -2,8 +2,15 @@
   <div class="container-fluid">
     <a class="navbar-brand fw-semibold" href="{{ url('index.html') }}">{{ site.title }}</a>
     <ul class="navbar-nav flex-row flex-wrap gap-3 ms-lg-3 me-auto">
-{% for r in site.repos %}
-      <li class="nav-item"><a class="nav-link{% if repo and repo.name == r.name %} active{% endif %}" href="{{ url(r.index) }}">{{ r.name }}</a></li>
+{% for category, repos in site.repos | groupby("category") %}
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle{% if repo and repo.category == category %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ category }}</a>
+        <ul class="dropdown-menu">
+{% for r in repos %}
+          <li><a class="dropdown-item{% if repo and repo.name == r.name %} active{% endif %}" href="{{ url(r.index) }}">{{ r.name }}</a></li>
+{% endfor %}
+        </ul>
+      </li>
 {% endfor %}
     </ul>
 {% if repo %}

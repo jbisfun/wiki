@@ -15,6 +15,8 @@ use crate::Paths;
 pub struct RepoConfig {
     /// Leave the repo out of the wiki.
     pub skip: bool,
+    /// Group label for the wiki header's dropdowns; repos without one land under "Other".
+    pub category: Option<String>,
     pub rust: Tool,
     pub lua: Tool,
     pub js: Tool,

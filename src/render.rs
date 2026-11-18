@@ -27,6 +27,7 @@ static IMAGE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|g
 static H1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^#\s+(.+?)\s*(\{#[^}]*\})?\s*$").expect("valid regex"));
 static FRONT_MATTER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^---\r?\n([\s\S]*?)\r?\n---\r?\n?").expect("valid regex"));
 static BODY_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<body[^>]*>").expect("valid regex"));
+static HEAD_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)</head>").expect("valid regex"));
 
 /// Relative URL from one output page to another, both site-relative.
 pub fn url(from: &str, to: &str) -> String {
@@ -204,6 +205,8 @@ struct RepoView {
     web: Option<String>,
     blob: Option<String>,
     head: String,
+    /// Group label for the wiki header's dropdowns (wiki.toml `category`, default "Other").
+    category: String,
     description: Option<String>,
     readme_page: Option<PageRef>,
     doc_pages: Vec<PageRef>,
@@ -450,6 +453,7 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
                 web: repo.web.clone(),
                 blob: site.links.blob.clone(),
                 head: repo.head.clone(),
+                category: repo.config.category.clone().unwrap_or_else(|| "Other".into()),
                 description: readme.and_then(|at| markdown.first_paragraph(&pages[*at].body)),
                 readme_page: readme.map(page_ref),
                 doc_pages: docs.iter().map(|(_, page)| page.clone()).collect(),
@@ -538,10 +542,10 @@ struct Renderer<'a> {
 }
 
 impl Renderer<'_> {
-    /// Every `.html` file under `dir` (a freshly copied rustdoc/LDoc output tree) gets a
-    /// small, self-contained header spliced in after `<body>`: back to the repo and the
-    /// site root. Inline-styled (no site stylesheet) so it can't clash with the doc
-    /// tool's own CSS.
+    /// Every `.html` file under `dir` (a freshly copied rustdoc/LDoc output tree) gets
+    /// the site's own navbar spliced in after `<body>`, plus the site stylesheet and
+    /// script linked into `<head>`, so these pages match the rest of the wiki instead
+    /// of standing apart in the doc tool's bare look.
     fn embed_headers(&self, dir: &Path, dist: &Path, repo_index: usize) -> Result<()> {
         for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
             if !entry.file_type().is_file() {
@@ -566,13 +570,24 @@ impl Renderer<'_> {
             let from = from.to_owned();
             Value::from_function(move |to: String| url(&from, &to))
         };
-        let header = self.env.get_template("partials/apidoc-header.html")?.render(context! {
+        let header = self.env.get_template("partials/navbar.html")?.render(context! {
             site => self.site.clone(),
             repo => Value::from(Serde(&self.views[repo_index])),
             url => url_value,
         })?;
-        let mut out = String::with_capacity(html.len() + header.len());
-        out.push_str(&html[..body_end]);
+        let mut out = String::with_capacity(html.len() + header.len() + 200);
+        match HEAD_TAG.find(&html) {
+            Some(found) => {
+                out.push_str(&html[..found.start()]);
+                out.push_str(&format!(
+                    "  <link rel=\"stylesheet\" href=\"{}\">\n  <script type=\"module\" src=\"{}\"></script>\n",
+                    url(from, "_assets/style.css"),
+                    url(from, "_assets/main.js"),
+                ));
+                out.push_str(&html[found.start()..body_end]);
+            }
+            None => out.push_str(&html[..body_end]),
+        }
         out.push_str(&header);
         out.push_str(&html[body_end..]);
         fs::write(path, out).with_context(|| format!("writing {}", path.display()))

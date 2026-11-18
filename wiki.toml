@@ -3,6 +3,7 @@
 # code docs from the tools it is detected for (see docs/README.md).
 #
 #   skip = true                         leave the repo out of the wiki
+#   category = "..."                    group label for the header's dropdowns (default "Other")
 #   rust = false | { packages = [..] }  cargo doc --no-deps (default: default-members)
 #   lua  = false | { files = [..] }     LDoc (default: tracked *.lua except *.x.lua hooks)
 #   js   = false | { files = [..] }     JSDoc (default: tracked *.js/*.mjs, needs package.json)
@@ -14,5 +15,63 @@ skip = true # the published site itself
 skip = true # upstream reference clone
 
 [repos.ycode]
+category = "ycode"
 # The whole Zed workspace is ~250 crates; document the ycode-specific ones.
 rust = { packages = ["lua_hooks"] }
+
+[repos.ycode-hermes]
+category = "ycode"
+
+[repos.ycode-idl]
+category = "ycode"
+
+[repos.ycode-manager]
+category = "ycode"
+
+[repos.ycode-offline]
+category = "ycode"
+
+[repos.ycode-pull]
+category = "ycode"
+
+[repos.apple-codesign]
+category = "Apple platform"
+
+[repos.AppStoreAuth]
+category = "Apple platform"
+
+[repos.FairplayedKit]
+category = "Apple platform"
+
+[repos.idl]
+category = "Apple platform"
+
+[repos."ios-webusb"]
+category = "Apple platform"
+
+[repos.MacADICore]
+category = "Apple platform"
+
+[repos.omnisette]
+category = "Apple platform"
+
+[repos.xkit]
+category = "Apple platform"
+
+[repos.dotenv]
+category = "Workspace tools"
+
+[repos.issues]
+category = "Workspace tools"
+
+[repos.pull]
+category = "Workspace tools"
+
+[repos.radar]
+category = "Workspace tools"
+
+[repos.tool]
+category = "Workspace tools"
+
+[repos.wiki]
+category = "Workspace tools"
