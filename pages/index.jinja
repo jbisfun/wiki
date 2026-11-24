@@ -1,7 +1,7 @@
 ---
 title: jbisfun wiki
 ---
-<h1 class="mb-3">{{ site.title }}</h1>
+<h1 class="mb-3 d-flex align-items-center gap-3"><img src="{{ url('_assets/icons/icon-256.png') }}" alt="" width="72" height="72" class="wiki-logo wiki-logo-lg">{{ site.title }}</h1>
 <p class="lead">{{ t('site-lead') }}</p>
 {% for key, repos in site.repos | groupby("category_key") %}
 <h2 class="h4 mt-5 mb-3">{{ repos[0].category }}</h2>

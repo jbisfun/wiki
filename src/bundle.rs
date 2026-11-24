@@ -1,6 +1,7 @@
 //! Client assets into dist/_assets: rolldown (embedded) bundles and minifies
 //! assets/main.js with its npm imports; lightningcss bundles assets/style.css
 //! (Bootstrap via @import) plus syntect's CSS for the highlight classes.
+//! assets/icons/ (the logo, favicons) is copied as is.
 use std::fs;
 use std::path::Path;
 
@@ -30,6 +31,14 @@ pub fn bundle(paths: &Paths, state: &mut State) -> Result<()> {
     fs::create_dir_all(&out)?;
     javascript(paths, &out)?;
     fs::write(out.join("style.css"), stylesheet(&paths.wiki.join("assets/style.css"))?)?;
+    let icons = paths.wiki.join("assets/icons");
+    if icons.is_dir() {
+        fs::create_dir_all(out.join("icons"))?;
+        for entry in fs::read_dir(&icons)? {
+            let entry = entry?;
+            fs::copy(entry.path(), out.join("icons").join(entry.file_name()))?;
+        }
+    }
     state.assets = key;
     Ok(())
 }

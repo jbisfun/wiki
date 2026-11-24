@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+ <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f4f1"/><stop offset="1" stop-color="#e3dfda"/></linearGradient>
+  <radialGradient id="shadow"><stop offset="0" stop-color="#3a2a20" stop-opacity=".30"/><stop offset=".6" stop-color="#3a2a20" stop-opacity=".14"/><stop offset="1" stop-color="#3a2a20" stop-opacity="0"/></radialGradient>
+  <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d49a60"/><stop offset="1" stop-color="#bd7f47"/></linearGradient>
+  <linearGradient id="leg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c78a51"/><stop offset="1" stop-color="#b87a45"/></linearGradient>
+  <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d3924"/><stop offset="1" stop-color="#47291a"/></linearGradient>
+  <radialGradient id="apple" cx=".38" cy=".35" r=".75"><stop offset="0" stop-color="#ee5a52"/><stop offset="1" stop-color="#cf3030"/></radialGradient>
+ </defs>
+ <rect width="512" height="512" fill="url(#bg)"/>
+<g transform="translate(-10.25 44.5) scale(1.5)">
+ <ellipse cx="180" cy="251" rx="140" ry="9" fill="url(#shadow)" stroke="none"/>
+ <g stroke="#573521" stroke-width="4.33" stroke-linejoin="round" stroke-linecap="round">
+  <!-- tail -->
+  <path d="M112 125 Q54 87 37 138 Q24 167 43 201 Q42 168 70 156 Q95 160 119 162Z" fill="url(#hair)"/>
+  <!-- far legs (right edges tucked under the near legs so no doubled outline) -->
+  <path d="M106 160 L100 232 L136 232 L144 172Z" fill="#985a35"/>
+  <path d="M184 160 L199 232 L229 232 L220 158Z" fill="#985a35"/>
+  <path d="M100 232 L136 232 L136 245 Q117 251 99.3 240Z" fill="#513020"/>
+  <path d="M199 232 L229 232 L229 243 Q214 249 200.7 240Z" fill="#513020"/>
+  <!-- near legs: hoof corners sit exactly on the leg edges -->
+  <path d="M133 168 L130.5 232 L159 232 L172 172Z" fill="url(#leg)"/>
+  <path d="M211 162 L222.7 232 L248.5 232 L238 158Z" fill="url(#leg)"/>
+  <path d="M130.5 232 L159 232 L156 246 Q143 254 130 246Z" fill="#513020"/>
+  <path d="M222.7 232 L248.5 232 L250.2 244 Q237 252 224.6 244Z" fill="#513020"/>
+  <!-- body -->
+  <path d="M103 126 Q135 97 195 117 Q215 79 237 67 Q266 74 268 108 Q262 140 238 167 Q209 192 143 184 Q95 183 103 126Z" fill="url(#coat)"/>
+  <!-- mane -->
+  <path d="M191 119 Q191 67 229 48 Q259 35 273 71 L249 92 Q218 80 215 131 Q201 130 191 119Z" fill="url(#hair)"/>
+  <!-- ears -->
+  <path d="M226 64 Q214 28 224 19 Q241 24 246 53 M249 57 Q252 21 267 24 Q278 40 266 68" fill="#c78a51"/>
+  <path d="M231 38 L237 54 M264 37 L260 52" stroke="#e8b58f" stroke-width="5.63" fill="none"/>
+  <!-- head -->
+  <path d="M228 60 Q250 45 272 67 Q287 84 292 113 Q311 133 301 149 Q291 165 268 151 Q252 142 244 124 Q217 112 216 87 Q216 70 228 60Z" fill="url(#coat)"/>
+  <path d="M273 111 Q290 105 300 124 Q315 139 301 151 Q289 160 276 149 L266 134Z" fill="#e7bf98"/>
+  <path d="M220 64 Q234 42 258 57 Q247 75 223 83 Q230 72 220 64Z" fill="#513020"/>
+  <ellipse cx="260" cy="89" rx="7.5" ry="9.5" fill="#2b1d17" stroke="none"/>
+  <circle cx="262.5" cy="85.5" r="2.8" fill="#fff" stroke="none"/>
+  <ellipse cx="291" cy="127" rx="4.3" ry="3" fill="#573521" stroke="none"/>
+  <path d="M276 145 Q288 149 300 141" fill="none"/>
+  <!-- apple -->
+  <g transform="translate(-59.4 -24.4) scale(1.2)"><path d="M292 151 Q279 141 272 155 Q260 172 277 190 Q289 202 300 192 Q312 196 321 180 Q331 158 315 151 Q304 146 292 151Z" fill="url(#apple)" stroke="#932c2c"/>
+  <path d="M297 153 Q296 148 299 144" fill="none" stroke-width="5.42"/>
+  <path d="M302 148 Q311 131 328 138 Q321 154 302 148Z" fill="#6fa845" stroke="#3f692c"/>
+  
+  <path d="M277 164 Q272 171 278 179" fill="none" stroke="#fb9c92" stroke-width="5.63"/>
+</g>
+   </g>
+</g>
+</svg>
