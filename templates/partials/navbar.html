@@ -1,22 +1,27 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top">
   <div class="container-fluid">
     <a class="navbar-brand fw-semibold" href="{{ url('index.html') }}">{{ site.title }}</a>
-    <ul class="navbar-nav flex-row flex-wrap gap-3 ms-lg-3 me-auto">
-{% for category, repos in site.repos | groupby("category") %}
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle{% if repo and repo.category == category %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ category }}</a>
-        <ul class="dropdown-menu">
-{% for r in repos %}
-          <li><a class="dropdown-item{% if repo and repo.name == r.name %} active{% endif %}" href="{{ url(r.index) }}">{{ r.name }}</a></li>
-{% endfor %}
-        </ul>
-      </li>
-{% endfor %}
-    </ul>
-{% if repo %}
-    <button class="navbar-toggler ms-3" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle pages">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+    <div class="d-flex align-items-center gap-2 d-lg-none">
+{% if repo and not apidoc %}
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar" aria-controls="sidebar" aria-expanded="false">Pages</button>
 {% endif %}
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#site-nav" aria-controls="site-nav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+    <div class="collapse navbar-collapse" id="site-nav">
+      <ul class="navbar-nav ms-lg-3 me-auto">
+{% for category, repos in site.repos | groupby("category") %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle{% if repo and repo.category == category %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">{{ category }}</a>
+          <ul class="dropdown-menu">
+{% for r in repos %}
+            <li><a class="dropdown-item{% if repo and repo.name == r.name %} active{% endif %}" href="{{ url(r.index) }}">{{ r.title }}</a></li>
+{% endfor %}
+          </ul>
+        </li>
+{% endfor %}
+      </ul>
+    </div>
   </div>
 </nav>

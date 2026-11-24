@@ -1,8 +1,9 @@
-<wiki-header style="position:fixed;top:0;left:0;right:0;z-index:2147483647;display:block">
+{#- `theme`: "light" pins the header to light (LDoc pages have no dark mode); unset follows the system like rustdoc does. -#}
+<wiki-header style="position:fixed;top:0;left:0;right:0;z-index:2147483647;display:block"{% if theme %} data-theme="{{ theme }}"{% endif %}>
   <template shadowrootmode="open">
     <link rel="stylesheet" href="{{ url('_assets/style.css') }}">
-    <div class="wiki-shadow" data-bs-theme="light">
-{% include "partials/navbar.html" %}
+    <div class="wiki-shadow" data-bs-theme="{{ theme or 'light' }}">
+{% with apidoc = true %}{% include "partials/navbar.html" %}{% endwith %}
     </div>
   </template>
 </wiki-header>

@@ -1,7 +1,7 @@
 //! Markdown for docs from many repos (comrak): GFM tables, autolinks, smart
 //! punctuation, `{#id}` heading attributes, syntect highlighting at build
-//! time (CSS classes, bat's syntaxes, no client JS), and `data-sourcepos` on every block so
-//! Radar can map a selection back to its source line. Links are rewritten
+//! time (CSS classes, bat's syntaxes, no client JS), and `data-sourcepos` on
+//! every block so Radar can map a selection back to its source line. Links are rewritten
 //! afterwards with lol_html, which covers markdown and raw HTML alike.
 use std::sync::LazyLock;
 
@@ -55,10 +55,11 @@ impl Markdown {
         comrak::markdown_to_html_with_plugins(&preprocess(source), &self.options, &plugins)
     }
 
-    /// Plain text of the first paragraph with text (not just badges), for the home page cards.
-    /// The first sentence of the first paragraph, as plain text (link and
-    /// emphasis text kept, markup dropped).
-    pub fn first_sentence(&self, source: &str) -> Option<String> {
+    /// Home page blurb: the first sentence of the first paragraph as plain
+    /// text (link and emphasis text kept, markup dropped), cut at its first
+    /// top-level comma, semicolon or colon when it runs past `BLURB` chars.
+    pub fn blurb(&self, source: &str) -> Option<String> {
+        const BLURB: usize = 80;
         let arena = Arena::new();
         let root = parse_document(&arena, &preprocess(source), &self.options);
         let paragraph = root
@@ -80,13 +81,27 @@ impl Markdown {
             .next()
             .unwrap_or(text.len());
         let sentence = text[..end].trim();
-        (!sentence.is_empty()).then(|| sentence.to_owned())
+        if sentence.is_empty() {
+            return None;
+        }
+        if sentence.chars().count() > BLURB {
+            let mut depth = 0;
+            for (at, ch) in sentence.char_indices() {
+                match ch {
+                    '(' | '[' => depth += 1,
+                    ')' | ']' => depth -= 1,
+                    ',' | ';' | ':' if depth == 0 => return Some(format!("{}.", &sentence[..at])),
+                    _ => {}
+                }
+            }
+        }
+        Some(sentence.to_owned())
     }
 }
 
 /// Replace the mdBook preprocessor commands used by the zed docs
 /// (`{#kb action}` / `{#action action}`) with code spans.
-pub fn preprocess(source: &str) -> String {
+fn preprocess(source: &str) -> String {
     static COMMAND: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{#(?:kb|action)\s+([^}]+)\}").expect("valid regex"));
     COMMAND.replace_all(source, |found: &regex::Captures| format!("`{}`", found[1].trim())).into_owned()
 }

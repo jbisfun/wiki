@@ -3,8 +3,8 @@
 # code docs from the tools it is detected for (see docs/README.md).
 #
 #   skip = true                         leave the repo out of the wiki
-#   category = "..."                    group label for the header's dropdowns (default "Other")
-#   description = "..."                 one line for the home page (default: first sentence of the README)
+#   category = "..."                    header dropdown (default: the pull group, else "Other")
+#   description = "..."                 one line for the home page (default: the README's first sentence)
 #   rust = false | { packages = [..] }  cargo doc --no-deps (default: default-members)
 #   lua  = false | { files = [..] }     LDoc (default: tracked *.lua except *.x.lua hooks)
 #   js   = false | { files = [..] }     JSDoc (default: tracked *.js/*.mjs, needs package.json)
@@ -41,6 +41,10 @@ category = "ycode"
 description = "pull's changes, commit box and jobs as ycode panels."
 category = "ycode"
 
+[repos.ycode-radar]
+description = "radar's reports as a ycode panel, filed from the editor."
+category = "ycode"
+
 [repos.apple-codesign]
 description = "Apple code signing in pure Rust."
 category = "Apple platform"
@@ -52,6 +56,9 @@ category = "Apple platform"
 [repos.FairplayedKit]
 description = "FairPlay IPA decryption on device, split out of LiveContainer."
 category = "Apple platform"
+
+[repos."fossify-ios/widgets-ios"]
+description = "The Fossify apps' home-screen widgets, as a WidgetKit extension."
 
 [repos.idl]
 description = "Builds iOS apps on Linux from one idlproj.yml."

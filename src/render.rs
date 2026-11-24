@@ -5,7 +5,7 @@
 //! all its page sources, its code reference keys, its settings, and the global
 //! key (templates, the repo list in the navbar, the wiki binary). `.jinja`
 //! pages can show anything about the site, so they are rendered every time.
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
@@ -26,8 +26,11 @@ use crate::state::{self, State};
 static IMAGE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|gif|svg|webp|avif|ico)$").expect("valid regex"));
 static H1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^#\s+(.+?)\s*(\{#[^}]*\})?\s*$").expect("valid regex"));
 static FRONT_MATTER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^---\r?\n([\s\S]*?)\r?\n---\r?\n?").expect("valid regex"));
+static SUMMARY_H1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^#\s+Summary\s*\n").expect("valid regex"));
 static BODY_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<body[^>]*>").expect("valid regex"));
-static HEAD_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)</head>").expect("valid regex"));
+static HEAD_END: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)</head>").expect("valid regex"));
+
+type Data = serde_json::Map<String, serde_json::Value>;
 
 /// Relative URL from one output page to another, both site-relative.
 pub fn url(from: &str, to: &str) -> String {
@@ -45,6 +48,12 @@ pub fn url(from: &str, to: &str) -> String {
     }
 }
 
+/// `url` bound to one page, as the template function `url(path)`.
+fn url_function(from: &str) -> Value {
+    let from = from.to_owned();
+    Value::from_function(move |to: String| url(&from, &to))
+}
+
 fn basename(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
@@ -52,9 +61,8 @@ fn basename(path: &str) -> &str {
 /// Output path of a source page: README/index.md -> index.html, x.md -> x.html,
 /// x.jinja -> x.html (or x as is when it has its own extension), other files as is.
 fn out_name(rel: &str) -> String {
-    let (dir, base) = rel.rsplit_once('/').map_or(("", rel), |(dir, base)| (dir, base));
-    let lower = base.to_lowercase();
-    let name = if lower == "readme.md" || lower == "index.md" {
+    let (dir, base) = rel.rsplit_once('/').unwrap_or(("", rel));
+    let name = if is_index(base) && base.to_lowercase().ends_with(".md") {
         "index.html".to_owned()
     } else if let Some(stem) = base.strip_suffix(".md") {
         format!("{stem}.html")
@@ -70,11 +78,16 @@ fn is_page(rel: &str) -> bool {
     rel.ends_with(".md") || rel.ends_with(".jinja")
 }
 
+/// A folder's own page: README or index, markdown or Jinja.
+fn is_index(base: &str) -> bool {
+    ["readme.md", "index.md", "readme.jinja", "index.jinja"].contains(&base.to_lowercase().as_str())
+}
+
 /// Front matter as a JSON object and the body after it. YAML first; the loose
 /// `key: value` lines mdBook accepts (e.g. unquoted colons) as a fallback.
-fn front_matter(source: &str) -> (serde_json::Map<String, serde_json::Value>, String) {
+fn front_matter(source: &str) -> (Data, String) {
     let Some(found) = FRONT_MATTER.captures(source) else {
-        return (serde_json::Map::new(), source.to_owned());
+        return (Data::new(), source.to_owned());
     };
     let body = source[found[0].len()..].to_owned();
     let matter = gray_matter::Matter::<gray_matter::engine::YAML>::new();
@@ -92,7 +105,8 @@ fn front_matter(source: &str) -> (serde_json::Map<String, serde_json::Value>, St
     (data, body)
 }
 
-fn title_of(data: &serde_json::Map<String, serde_json::Value>, body: &str, rel: &str) -> String {
+/// Front matter `title`, else the first `# heading`, else the file name.
+fn title_of(data: &Data, body: &str, rel: &str) -> String {
     match data.get("title") {
         Some(serde_json::Value::String(title)) => return title.clone(),
         Some(serde_json::Value::Null) | None => {}
@@ -101,8 +115,7 @@ fn title_of(data: &serde_json::Map<String, serde_json::Value>, body: &str, rel: 
     if let Some(found) = H1.captures(body) {
         return found[1].replace(['`', '*', '_'], "");
     }
-    let base = basename(rel);
-    base.trim_end_matches(".md").trim_end_matches(".jinja").replace(['-', '_'], " ")
+    basename(rel).trim_end_matches(".md").trim_end_matches(".jinja").replace(['-', '_'], " ")
 }
 
 /// Where links inside one repo's pages go.
@@ -185,8 +198,7 @@ impl TreeNode {
                 };
                 node = &mut node.children[at];
             }
-            let lower = leaf.to_lowercase();
-            if ["readme.md", "index.md", "readme.jinja", "index.jinja"].contains(&lower.as_str()) {
+            if is_index(leaf) {
                 node.page = Some(page.clone());
             } else {
                 node.children.push(TreeNode { name: (*leaf).to_owned(), page: Some(page.clone()), children: Vec::new() });
@@ -199,13 +211,15 @@ impl TreeNode {
 /// What templates see as `repo`.
 #[derive(Serialize)]
 struct RepoView {
+    /// The pull repo name, e.g. `fossify-ios/notes-ios`.
     name: String,
+    /// The name without its pull group, e.g. `notes-ios`.
     title: String,
     index: String,
     web: Option<String>,
     blob: Option<String>,
     head: String,
-    /// Group label for the wiki header's dropdowns (wiki.toml `category`, default "Other").
+    /// Header dropdown: wiki.toml `category`, else the pull group, else "Other".
     category: String,
     description: Option<String>,
     readme_page: Option<PageRef>,
@@ -223,7 +237,7 @@ struct PageView<'a> {
     title: &'a str,
     out: &'a str,
     rel: &'a str,
-    data: &'a serde_json::Map<String, serde_json::Value>,
+    data: &'a Data,
     /// Plain markdown page: blocks map to source lines, so Radar works.
     radar: bool,
 }
@@ -233,13 +247,14 @@ struct Page {
     rel: String,
     doc_rel: Option<String>,
     out: String,
-    data: serde_json::Map<String, serde_json::Value>,
+    data: Data,
     /// The whole file (markdown is rendered from it so source lines match).
     source: String,
     body: String,
     title: String,
     readme: bool,
-    synthetic: bool,
+    /// Stand-in entry page of a repo without a README (templates/repo-index.html).
+    placeholder: bool,
 }
 
 impl Page {
@@ -256,6 +271,10 @@ impl Page {
             radar: self.repo.is_some() && self.rel.ends_with(".md") && !self.is_template(),
         }
     }
+
+    fn page_ref(&self) -> PageRef {
+        PageRef { title: self.title.clone(), out: self.out.clone() }
+    }
 }
 
 /// A repo with its sources resolved.
@@ -264,12 +283,142 @@ struct SiteRepo<'a> {
     links: Arc<Links>,
     /// (repo-relative source, output path) of every docs file that isn't a page.
     assets: Vec<(String, String)>,
+    /// Indexes into the page list, entry page first.
     pages: Vec<usize>,
     apis: Vec<Api>,
     docs_rel: Option<String>,
     book_title: Option<String>,
     summary: Option<String>,
+    /// Key of the repo's own inputs; `render` folds in the global key.
     key: String,
+}
+
+impl<'a> SiteRepo<'a> {
+    /// Read a repo's README and docs into `pages`; None when it has neither
+    /// pages nor a code reference. `index` is its position in the site's repos.
+    fn load(repo: &'a Repo, apis: Vec<Api>, index: usize, state: &State, pages: &mut Vec<Page>) -> Result<Option<Self>> {
+        // (repo-relative source, docs-relative path, output path)
+        let mut files: Vec<(String, Option<String>, String)> = Vec::new();
+        if let Some(readme) = &repo.readme {
+            files.push((readme.clone(), None, format!("{}/index.html", repo.name)));
+        }
+        let (mut docs_rel, mut book_title) = (None, None);
+        let docs = repo.path.join("docs");
+        if docs.is_dir() {
+            let (root, title) = docs_root(&docs);
+            let rel = root.strip_prefix(&repo.path).unwrap_or(&root).to_string_lossy().into_owned();
+            for file in walk(&root) {
+                files.push((format!("{rel}/{file}"), Some(file.clone()), format!("{}/docs/{}", repo.name, out_name(&file))));
+            }
+            docs_rel = Some(rel);
+            book_title = title;
+        }
+        if apis.is_empty() && !files.iter().any(|(rel, ..)| is_page(rel)) {
+            return Ok(None);
+        }
+
+        let mut inputs = vec![serde_json::to_string(&repo.config)?, repo.branch.clone(), repo.web.clone().unwrap_or_default()];
+        inputs.extend(apis.iter().map(|api| format!("{}\0{}", api.tool, api.path)));
+        let prefix = format!("{}/", repo.name);
+        inputs.extend(state.apidoc.iter().filter(|(id, _)| id.starts_with(&prefix)).map(|(_, api)| api.key.clone()));
+
+        let links = Links {
+            by_rel: files.iter().map(|(rel, _, out)| (rel.clone(), out.clone())).collect(),
+            blob: repo.web.as_ref().map(|web| format!("{web}/blob/{}/", repo.branch)),
+            raw: repo.web.as_ref().map(|web| format!("{web}/raw/{}/", repo.branch)),
+        };
+        let mut site = SiteRepo {
+            repo,
+            links: Arc::new(links),
+            assets: Vec::new(),
+            pages: Vec::new(),
+            apis,
+            docs_rel,
+            book_title,
+            summary: None,
+            key: String::new(),
+        };
+        for (rel, doc_rel, out) in files {
+            let src = repo.path.join(&rel);
+            inputs.push(format!("{rel}\0{}", state::file_id(&src)));
+            if doc_rel.as_deref() == Some("SUMMARY.md") {
+                site.summary = Some(fs::read_to_string(&src)?);
+            } else if !is_page(&rel) {
+                site.assets.push((rel, out));
+            } else {
+                let source = fs::read_to_string(&src).with_context(|| format!("reading {}", src.display()))?;
+                let (data, body) = front_matter(&source);
+                let title = title_of(&data, &body, &rel);
+                let readme = Some(&rel) == repo.readme.as_ref();
+                site.pages.push(pages.len());
+                pages.push(Page { repo: Some(index), rel, doc_rel, out, data, source, body, title, readme, placeholder: false });
+            }
+        }
+        if repo.readme.is_none() {
+            site.pages.insert(0, pages.len());
+            pages.push(Page {
+                repo: Some(index),
+                rel: String::new(),
+                doc_rel: None,
+                out: format!("{}/index.html", repo.name),
+                data: Data::new(),
+                source: String::new(),
+                body: String::new(),
+                title: repo.name.clone(),
+                readme: false,
+                placeholder: true,
+            });
+        }
+        site.key = state::key(inputs);
+        Ok(Some(site))
+    }
+
+    fn view(&self, pages: &[Page], markdown: &Markdown) -> RepoView {
+        let repo = self.repo;
+        let readme = self.pages.iter().map(|at| &pages[*at]).find(|page| page.readme);
+        let docs: Vec<(String, PageRef)> = self
+            .pages
+            .iter()
+            .map(|at| &pages[*at])
+            .filter_map(|page| page.doc_rel.clone().map(|doc_rel| (doc_rel, page.page_ref())))
+            .collect();
+        let apis: Vec<ApiView> = self
+            .apis
+            .iter()
+            .map(|api| ApiView {
+                tool: api.tool.clone(),
+                title: api.title.clone(),
+                label: match api.tool.as_str() {
+                    "rust" => "Rust",
+                    "lua" => "Lua",
+                    "js" => "JavaScript",
+                    other => other,
+                }
+                .to_owned(),
+                out: format!("{}/api/{}", repo.name, api.path),
+            })
+            .collect();
+        let mut api_labels: Vec<String> = apis.iter().map(|api| api.label.clone()).collect();
+        api_labels.dedup();
+        let group = repo.name.rsplit_once('/').map(|(group, _)| group);
+        RepoView {
+            name: repo.name.clone(),
+            title: basename(&repo.name).to_owned(),
+            index: format!("{}/index.html", repo.name),
+            web: repo.web.clone(),
+            blob: self.links.blob.clone(),
+            head: repo.head.clone(),
+            category: repo.config.category.as_deref().or(group).unwrap_or("Other").to_owned(),
+            description: repo.config.description.clone().or_else(|| readme.and_then(|page| markdown.blurb(&page.body))),
+            readme_page: readme.map(Page::page_ref),
+            doc_pages: docs.iter().map(|(_, page)| page.clone()).collect(),
+            tree: TreeNode::build(&docs),
+            apis,
+            api_labels,
+            book_title: self.book_title.clone(),
+            has_summary: self.summary.is_some(),
+        }
+    }
 }
 
 /// mdBook projects keep pages in book.toml's `src` (default "src").
@@ -303,50 +452,30 @@ fn write(dist: &Path, out: &str, html: &str) -> Result<()> {
     fs::write(&dest, html).with_context(|| format!("writing {}", dest.display()))
 }
 
+/// Remove everything in dist/ except the bundled assets.
+fn clear_pages(dist: &Path) -> Result<()> {
+    for entry in fs::read_dir(dist)? {
+        let entry = entry?;
+        if entry.file_name() != "_assets" {
+            let path = entry.path();
+            if path.is_dir() { fs::remove_dir_all(&path)? } else { fs::remove_file(&path)? }
+        }
+    }
+    Ok(())
+}
+
 pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, state: &mut State) -> Result<()> {
     let site_title = std::env::var("WIKI_TITLE").unwrap_or_else(|_| "jbisfun wiki".into());
     let markdown = Arc::new(Markdown::new());
     let dist = &paths.dist;
 
-    // Sources of every repo: (repo-relative source, docs-relative path, output path).
-    let mut site_repos = Vec::new();
     let mut pages: Vec<Page> = Vec::new();
-    let mut sources = Vec::new();
+    let mut site_repos: Vec<SiteRepo> = Vec::new();
     for repo in repos {
-        let mut files: Vec<(String, Option<String>, String)> = Vec::new();
-        if let Some(readme) = &repo.readme {
-            files.push((readme.clone(), None, format!("{}/index.html", repo.name)));
-        }
-        let mut docs_rel = None;
-        let mut book_title = None;
-        let docs = repo.path.join("docs");
-        if docs.is_dir() {
-            let (root, title) = docs_root(&docs);
-            let rel = root.strip_prefix(&repo.path).unwrap_or(&root).to_string_lossy().into_owned();
-            for file in walk(&root) {
-                files.push((format!("{rel}/{file}"), Some(file.clone()), format!("{}/docs/{}", repo.name, out_name(&file))));
-            }
-            docs_rel = Some(rel);
-            book_title = title;
-        }
         let repo_apis = apis.get(&repo.name).cloned().unwrap_or_default();
-        if !files.iter().any(|(rel, ..)| is_page(rel)) && repo_apis.is_empty() {
-            continue;
+        if let Some(site) = SiteRepo::load(repo, repo_apis, site_repos.len(), state, &mut pages)? {
+            site_repos.push(site);
         }
-        sources.push(files);
-        let blob = repo.web.as_ref().map(|web| format!("{web}/blob/{}/", repo.branch));
-        let raw = repo.web.as_ref().map(|web| format!("{web}/raw/{}/", repo.branch));
-        site_repos.push(SiteRepo {
-            repo,
-            links: Arc::new(Links { by_rel: HashMap::new(), blob, raw }),
-            assets: Vec::new(),
-            pages: Vec::new(),
-            apis: repo_apis,
-            docs_rel,
-            book_title,
-            summary: None,
-            key: String::new(),
-        });
     }
 
     let mut global_inputs = state::dir_ids(&paths.wiki.join("templates"));
@@ -355,124 +484,27 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
     global_inputs.extend(site_repos.iter().map(|site| site.repo.name.clone()));
     let global = state::key(global_inputs);
     if state.global != global && dist.is_dir() {
-        // Everything but the bundled assets is stale.
-        for entry in fs::read_dir(dist)? {
-            let entry = entry?;
-            if entry.file_name() != "_assets" {
-                let path = entry.path();
-                if path.is_dir() { fs::remove_dir_all(&path)? } else { fs::remove_file(&path)? }
-            }
-        }
+        clear_pages(dist)?;
     }
-
-    for (index, (site, files)) in site_repos.iter_mut().zip(sources).enumerate() {
-        let repo = site.repo;
-        let mut key_inputs = vec![global.clone(), serde_json::to_string(&repo.config)?, repo.branch.clone(), repo.web.clone().unwrap_or_default()];
-        key_inputs.extend(site.apis.iter().map(|api| format!("{}\0{}", api.tool, api.path)));
-        key_inputs.extend(state.apidoc.iter().filter(|(id, _)| id.starts_with(&format!("{}/", repo.name))).map(|(_, api)| api.key.clone()));
-        let mut by_rel = HashMap::new();
-        for (rel, doc_rel, out) in files {
-            let src = repo.path.join(&rel);
-            key_inputs.push(format!("{rel}\0{}", state::file_id(&src)));
-            by_rel.insert(rel.clone(), out.clone());
-            if doc_rel.as_deref() == Some("SUMMARY.md") {
-                site.summary = Some(fs::read_to_string(&src)?);
-                continue;
-            }
-            if !is_page(&rel) {
-                site.assets.push((rel, out));
-                continue;
-            }
-            let source = fs::read_to_string(&src).with_context(|| format!("reading {}", src.display()))?;
-            let (data, body) = front_matter(&source);
-            let title = title_of(&data, &body, &rel);
-            site.pages.push(pages.len());
-            pages.push(Page { repo: Some(index), readme: Some(&rel) == repo.readme.as_ref(), rel, doc_rel, out, data, source, body, title, synthetic: false });
-        }
-        if repo.readme.is_none() {
-            site.pages.insert(0, pages.len());
-            pages.push(Page {
-                repo: Some(index),
-                rel: String::new(),
-                doc_rel: None,
-                out: format!("{}/index.html", repo.name),
-                data: Default::default(),
-                source: String::new(),
-                body: String::new(),
-                title: repo.name.clone(),
-                readme: false,
-                synthetic: true,
-            });
-        }
-        if let Some(links) = Arc::get_mut(&mut site.links) {
-            links.by_rel = by_rel;
-        }
-        site.key = state::key(key_inputs);
+    for site in &mut site_repos {
+        site.key = state::key([global.as_str(), site.key.as_str()]);
     }
 
     for rel in walk(&paths.wiki.join("pages")).into_iter().filter(|rel| rel.ends_with(".jinja")) {
         let source = fs::read_to_string(paths.wiki.join("pages").join(&rel))?;
         let (data, body) = front_matter(&source);
         let title = data.get("title").and_then(serde_json::Value::as_str).unwrap_or(&site_title).to_owned();
-        pages.push(Page { repo: None, out: out_name(&rel), rel, doc_rel: None, data, source, body, title, readme: false, synthetic: false });
+        pages.push(Page { repo: None, out: out_name(&rel), rel, doc_rel: None, data, source, body, title, readme: false, placeholder: false });
     }
 
-    let views: Vec<RepoView> = site_repos
-        .iter()
-        .map(|site| {
-            let repo = site.repo;
-            let page_ref = |at: &usize| PageRef { title: pages[*at].title.clone(), out: pages[*at].out.clone() };
-            let readme = site.pages.iter().find(|at| pages[**at].readme);
-            let docs: Vec<(String, PageRef)> = site
-                .pages
-                .iter()
-                .filter_map(|at| pages[*at].doc_rel.clone().map(|doc_rel| (doc_rel, page_ref(at))))
-                .collect();
-            let apis: Vec<ApiView> = site
-                .apis
-                .iter()
-                .map(|api| ApiView {
-                    tool: api.tool.clone(),
-                    title: api.title.clone(),
-                    label: match api.tool.as_str() {
-                        "rust" => "Rust",
-                        "lua" => "Lua",
-                        "js" => "JavaScript",
-                        other => other,
-                    }
-                    .to_owned(),
-                    out: format!("{}/api/{}", repo.name, api.path),
-                })
-                .collect();
-            let mut api_labels: Vec<String> = apis.iter().map(|api| api.label.clone()).collect();
-            api_labels.dedup();
-            RepoView {
-                name: repo.name.clone(),
-                title: repo.name.clone(),
-                index: format!("{}/index.html", repo.name),
-                web: repo.web.clone(),
-                blob: site.links.blob.clone(),
-                head: repo.head.clone(),
-                category: repo.config.category.clone().unwrap_or_else(|| "Other".into()),
-                description: repo.config.description.clone().or_else(|| readme.and_then(|at| markdown.first_sentence(&pages[*at].body))),
-                readme_page: readme.map(page_ref),
-                doc_pages: docs.iter().map(|(_, page)| page.clone()).collect(),
-                tree: TreeNode::build(&docs),
-                apis,
-                api_labels,
-                book_title: site.book_title.clone(),
-                has_summary: site.summary.is_some(),
-            }
-        })
-        .collect();
-
+    let views: Vec<RepoView> = site_repos.iter().map(|site| site.view(&pages, &markdown)).collect();
     let mut env = Environment::new();
     env.set_loader(path_loader(paths.wiki.join("templates")));
     env.set_auto_escape_callback(|_| AutoEscape::Html);
-    let all_pages: Vec<PageRef> = pages.iter().map(|page| PageRef { title: page.title.clone(), out: page.out.clone() }).collect();
-    let site_value = context! { title => site_title, repos => Value::from(Serde(&views)), pages => Value::from(Serde(&all_pages)) };
+    let all_pages: Vec<PageRef> = pages.iter().map(Page::page_ref).collect();
+    let site = context! { title => site_title, repos => Value::from(Serde(&views)), pages => Value::from(Serde(&all_pages)) };
+    let renderer = Renderer { env: &env, markdown: &markdown, site: &site, site_repos: &site_repos, views: &views };
 
-    let renderer = Renderer { env: &env, markdown: &markdown, site: &site_value, site_repos: &site_repos, views: &views };
     let mut rendered = 0;
     let mut kept = BTreeMap::new();
     let mut changed = Vec::new();
@@ -481,38 +513,19 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
         let fresh = state.repos.get(name) == Some(&site.key) && dist.join(name).is_dir();
         if !fresh {
             changed.push(name.as_str());
-            let dir = dist.join(name);
-            if dir.exists() {
-                fs::remove_dir_all(&dir)?;
-            }
-            for (rel, out) in &site.assets {
-                let dest = dist.join(out);
-                fs::create_dir_all(dest.parent().context("asset without dir")?)?;
-                fs::copy(site.repo.path.join(rel), &dest)?;
-            }
-            let tools: std::collections::BTreeSet<&str> = site.apis.iter().map(|api| api.tool.as_str()).collect();
-            for tool in tools {
-                let dest = dir.join("api").join(tool);
-                copy_dir(&paths.build.join("api").join(name).join(tool), &dest)?;
-                // rustdoc/LDoc pages are standalone documents, not rendered through
-                // layout.html: embed a small header directly so they stay reachable.
-                if tool == "rust" || tool == "lua" {
-                    renderer.embed_headers(&dest, dist, index)?;
-                }
-            }
+            renderer.copy_files(paths, index)?;
         }
-        for at in &site.pages {
-            let page = &pages[*at];
+        for page in site.pages.iter().map(|at| &pages[*at]) {
             if fresh && !page.is_template() {
                 continue;
             }
-            write(dist, &page.out, &renderer.page(page, Some(index))?)?;
+            write(dist, &page.out, &renderer.page(page)?)?;
             rendered += 1;
         }
         kept.insert(name.clone(), site.key.clone());
     }
     for page in pages.iter().filter(|page| page.repo.is_none()) {
-        write(dist, &page.out, &renderer.page(page, None)?)?;
+        write(dist, &page.out, &renderer.page(page)?)?;
         rendered += 1;
     }
     for name in state.repos.keys().filter(|name| !kept.contains_key(*name)) {
@@ -526,10 +539,7 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
 
     let api_count: usize = site_repos.iter().map(|site| site.apis.len()).sum();
     let changed = if changed.is_empty() { "none".to_owned() } else { changed.join(", ") };
-    println!(
-        "wiki: {rendered} of {} pages rendered, {api_count} code references; regenerated repos: {changed}",
-        pages.len(),
-    );
+    println!("wiki: {rendered} of {} pages rendered, {api_count} code references; regenerated repos: {changed}", pages.len());
     Ok(())
 }
 
@@ -542,39 +552,61 @@ struct Renderer<'a> {
 }
 
 impl Renderer<'_> {
+    /// Start a repo's dist/ folder over with its docs assets and code reference.
+    fn copy_files(&self, paths: &Paths, index: usize) -> Result<()> {
+        let site = &self.site_repos[index];
+        let name = &site.repo.name;
+        let dir = paths.dist.join(name);
+        if dir.exists() {
+            fs::remove_dir_all(&dir)?;
+        }
+        for (rel, out) in &site.assets {
+            let dest = paths.dist.join(out);
+            fs::create_dir_all(dest.parent().context("asset without dir")?)?;
+            fs::copy(site.repo.path.join(rel), &dest)?;
+        }
+        let tools: BTreeSet<&str> = site.apis.iter().map(|api| api.tool.as_str()).collect();
+        for tool in tools {
+            let dest = dir.join("api").join(tool);
+            copy_dir(&paths.build.join("api").join(name).join(tool), &dest)?;
+            // rustdoc/LDoc pages are standalone documents, not rendered through
+            // layout.html: embed the site header so they stay reachable. LDoc
+            // has no dark mode, so its header stays light.
+            match tool {
+                "rust" => self.embed_headers(&dest, &paths.dist, index, None)?,
+                "lua" => self.embed_headers(&dest, &paths.dist, index, Some("light"))?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     /// Every `.html` file under `dir` (a freshly copied rustdoc/LDoc output tree) gets
     /// the site header (partials/apidoc-header.html) spliced in after `<body>`. The
     /// header is a fixed element whose content lives in a shadow root, so the site's
     /// stylesheet styles it without touching the doc tool's own CSS; the only thing
     /// added to the page itself is room at the top for the header.
-    fn embed_headers(&self, dir: &Path, dist: &Path, repo_index: usize) -> Result<()> {
+    fn embed_headers(&self, dir: &Path, dist: &Path, repo: usize, theme: Option<&str>) -> Result<()> {
         for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
-            if !entry.file_type().is_file() {
-                continue;
-            }
             let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("html") {
-                continue;
+            if entry.file_type().is_file() && path.extension().is_some_and(|ext| ext == "html") {
+                let from = path.strip_prefix(dist)?.to_string_lossy().replace('\\', "/");
+                self.embed_header(path, &from, repo, theme)?;
             }
-            let from = path.strip_prefix(dist)?.to_string_lossy().replace('\\', "/");
-            self.embed_header(path, &from, repo_index)?;
         }
         Ok(())
     }
 
-    fn embed_header(&self, path: &Path, from: &str, repo_index: usize) -> Result<()> {
+    fn embed_header(&self, path: &Path, from: &str, repo: usize, theme: Option<&str>) -> Result<()> {
         let html = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-        let Some(body_end) = BODY_TAG.find(&html).map(|found| found.end()) else {
+        let Some(body) = BODY_TAG.find(&html).map(|found| found.end()) else {
             return Ok(());
-        };
-        let url_value = {
-            let from = from.to_owned();
-            Value::from_function(move |to: String| url(&from, &to))
         };
         let header = self.env.get_template("partials/apidoc-header.html")?.render(context! {
             site => self.site.clone(),
-            repo => Value::from(Serde(&self.views[repo_index])),
-            url => url_value,
+            repo => Value::from(Serde(&self.views[repo])),
+            url => url_function(from),
+            theme => theme,
         })?;
         // header.js measures the header into --wiki-header-height. rustdoc's sidebar is
         // sticky at the top of the viewport, so it moves down by the same amount.
@@ -586,36 +618,36 @@ impl Renderer<'_> {
             url(from, "_assets/main.js"),
         );
         let mut out = String::with_capacity(html.len() + header.len() + head.len());
-        match HEAD_TAG.find(&html) {
+        match HEAD_END.find(&html) {
             Some(found) => {
                 out.push_str(&html[..found.start()]);
                 out.push_str(&head);
-                out.push_str(&html[found.start()..body_end]);
+                out.push_str(&html[found.start()..body]);
             }
-            None => out.push_str(&html[..body_end]),
+            None => out.push_str(&html[..body]),
         }
         out.push_str(&header);
-        out.push_str(&html[body_end..]);
+        out.push_str(&html[body..]);
         fs::write(path, out).with_context(|| format!("writing {}", path.display()))
     }
 
-    fn page(&self, page: &Page, repo: Option<usize>) -> Result<String> {
-        let from = page.out.clone();
-        let base = page.rel.rsplit_once('/').map_or(".", |(dir, _)| dir).to_owned();
-        let links = repo.map(|at| self.site_repos[at].links.clone());
-        let markdown = self.markdown.clone();
+    fn page(&self, page: &Page) -> Result<String> {
+        let from = page.out.as_str();
+        // Markdown with the repo's links resolved from this page.
         let md = {
-            let (from, base, links) = (from.clone(), base.clone(), links.clone());
-            move |source: &str| -> Result<String> {
+            let markdown = self.markdown.clone();
+            let base = page.rel.rsplit_once('/').map_or(".", |(dir, _)| dir).to_owned();
+            let links = page.repo.map(|at| self.site_repos[at].links.clone());
+            let from = from.to_owned();
+            Arc::new(move |source: &str| -> Result<String> {
                 let html = markdown.render(source);
                 match &links {
                     Some(links) => markdown::rewrite_links(&html, |link| links.resolve(link, &base, &from)),
                     None => Ok(html),
                 }
-            }
+            })
         };
-        let md = Arc::new(md);
-        let md_value = {
+        let md_function = {
             let md = md.clone();
             Value::from_function(move |source: String| -> Result<Value, minijinja::Error> {
                 md(&source)
@@ -623,25 +655,21 @@ impl Renderer<'_> {
                     .map_err(|err| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, err.to_string()))
             })
         };
-        let url_value = {
-            let from = from.clone();
-            Value::from_function(move |to: String| url(&from, &to))
-        };
-        let repo_view = repo.map(|at| Value::from(Serde(&self.views[at])));
-        let sidebar = match repo {
-            Some(at) => self.sidebar(at, &from, &url_value)?,
+        let url_value = url_function(from);
+        let sidebar = match page.repo {
+            Some(at) => self.sidebar(at, from, &url_value)?,
             None => String::new(),
         };
         let data = context! {
             site => self.site.clone(),
             page => Value::from(Serde(page.view())),
-            repo => repo_view,
+            repo => page.repo.map(|at| Value::from(Serde(&self.views[at]))),
             url => url_value,
-            md => md_value,
+            md => md_function,
             sidebar => Value::from_safe_string(sidebar),
         };
 
-        let content = if page.synthetic {
+        let content = if page.placeholder {
             self.env.get_template("repo-index.html")?.render(&data)?
         } else if page.is_template() {
             let html = self.env.render_named_str(&page.rel, &page.body, &data)?;
@@ -664,11 +692,10 @@ impl Renderer<'_> {
         let site = &self.site_repos[at];
         let summary = match &site.summary {
             Some(source) => {
-                let source = Regex::new(r"(?i)^#\s+Summary\s*\n")?.replace(source, "");
+                let html = self.markdown.render(&SUMMARY_H1.replace(source, ""));
                 // Summary links are relative to the docs root.
-                let html = self.markdown.render(&source);
-                let base = site.docs_rel.clone().unwrap_or_else(|| ".".into());
-                Some(markdown::rewrite_links(&html, |link| site.links.resolve(link, &base, from))?)
+                let base = site.docs_rel.as_deref().unwrap_or(".");
+                Some(markdown::rewrite_links(&html, |link| site.links.resolve(link, base, from))?)
             }
             None => None,
         };

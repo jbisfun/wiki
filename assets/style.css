@@ -1,12 +1,19 @@
 /* Bundled by lightningcss; the code highlighting CSS is generated from syntect themes. */
 @import "../node_modules/bootstrap/dist/css/bootstrap.css";
 
-.wiki-sidebar {
-  position: sticky;
-  top: 3.5rem;
-  max-height: calc(100vh - 3.5rem);
-  overflow-y: auto;
-  font-size: 0.9rem;
+/* Header */
+.navbar .nav-link.active { font-weight: 600; }
+.navbar .dropdown-menu { max-height: 70vh; overflow-y: auto; }
+
+/* Repo sidebar */
+.wiki-sidebar { font-size: 0.9rem; }
+@media (min-width: 992px) {
+  .wiki-sidebar {
+    position: sticky;
+    top: 3.5rem;
+    height: calc(100vh - 3.5rem);
+    overflow-y: auto;
+  }
 }
 .wiki-sidebar ul, .wiki-sidebar ol { list-style: none; padding-left: 0.9rem; margin-bottom: 0.25rem; }
 .wiki-sidebar > ul, .wiki-sidebar > ol { padding-left: 0; }
@@ -16,17 +23,10 @@
 .wiki-sidebar a:hover { color: var(--bs-link-color); }
 .wiki-sidebar a.active { color: var(--bs-link-color); font-weight: 600; }
 
-.wiki-content { max-width: 60rem; }
+/* Page content; the footer stays at the bottom of short pages. */
+.wiki-content { max-width: 60rem; min-height: calc(100vh - 3.5rem); display: flex; flex-direction: column; }
+.wiki-content > footer { margin-top: auto !important; }
 .wiki-content.wiki-wide { max-width: 84rem; }
-
-/* The header embedded in rustdoc/LDoc pages lives in a shadow root (see
-   partials/apidoc-header.html), so these rules only reach it, never the doc page. */
-.wiki-shadow {
-  font-family: var(--bs-body-font-family);
-  font-size: var(--bs-body-font-size);
-  line-height: var(--bs-body-line-height);
-  color: var(--bs-body-color);
-}
 .wiki-content pre { background: var(--bs-tertiary-bg); padding: 0.75rem 1rem; border-radius: var(--bs-border-radius); }
 .wiki-content blockquote { border-left: 0.25rem solid var(--bs-border-color); padding-left: 1rem; color: var(--bs-secondary-color); }
 .wiki-content img { max-width: 100%; height: auto; }
@@ -34,3 +34,15 @@
 .wiki-content .anchor { text-decoration: none; margin-left: 0.4rem; visibility: hidden; }
 .wiki-content .anchor::before { content: "#"; }
 .wiki-content :is(h1, h2, h3, h4, h5, h6):hover .anchor { visibility: visible; }
+
+/* The header embedded in rustdoc/LDoc pages lives in a shadow root (see
+   partials/apidoc-header.html), so these rules only reach it, never the doc
+   page. Bootstrap's font variables sit on :root, which a shadow root doesn't
+   have, so the font is spelled out. */
+.wiki-shadow {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--bs-body-color);
+  text-align: left;
+}
