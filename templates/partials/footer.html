@@ -2,5 +2,8 @@
 {% if repo and page.rel and repo.blob %}
   <a href="{{ repo.blob }}{{ page.rel }}">{{ t('footer-source') }}</a> ·
 {% endif %}
-  {{ t('footer-built-by') }} <a href="https://github.com/jbisfun/wiki">jbisfun/wiki</a>
+  {{ t('footer-built-by') }} <a href="https://github.com/jbisfun/wiki">jbisfun/wiki</a> ·
+  {{ t('footer-copyright', year=site.year) }} <a href="https://github.com/jbisfun">jbisfun</a> {{ t('footer-contributors') }} ·
+  <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">{{ t('footer-license') }}</a>
+  <p class="mt-1 mb-0">{{ t('footer-apple') }}</p>
 </footer>

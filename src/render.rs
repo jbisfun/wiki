@@ -396,7 +396,7 @@ impl<'a> SiteRepo<'a> {
             pages.push(Page {
                 repo: Some(index),
                 out: format!("{}/index.html", repo.name),
-                title: repo.name.clone(),
+                title: repo.config.title.clone().unwrap_or_else(|| repo.name.clone()),
                 placeholder: true,
                 ..Default::default()
             });
@@ -446,7 +446,7 @@ impl<'a> SiteRepo<'a> {
         let group = repo.name.rsplit_once('/').map(|(group, _)| group);
         RepoView {
             name: repo.name.clone(),
-            title: basename(&repo.name).to_owned(),
+            title: repo.config.title.clone().unwrap_or_else(|| basename(&repo.name).to_owned()),
             index: format!("{}{}/index.html", locale.prefix, repo.name),
             web: repo.web.clone(),
             blob: self.links.blob.clone(),
@@ -568,6 +568,7 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
         let site = context! {
             title => site_title.clone(),
             home => format!("{}index.html", locale.prefix),
+            year => jiff::ZonedDateTime::now().year(),
             lang => locale.tag.clone(),
             repos => Value::from(Serde(&views)),
             pages => Value::from(Serde(&all_pages)),

@@ -10,3 +10,6 @@ just publish   # stage into ../jbisfun.github.io
 ```
 
 Docs: [docs/README.md](docs/README.md), [templating](docs/templating.jinja).
+
+
+The published site is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). It is not affiliated with Apple Inc.

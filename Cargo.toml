@@ -16,6 +16,7 @@ futures = "0.3.34"
 git2 = "0.21.0"
 gray_matter = "0.3.2"
 ignore = "0.4.34"
+jiff = "1.0.2"
 lightningcss = { version = "1.0.0-alpha.72", features = ["bundler"] }
 lol_html = "3.0.3"
 minijinja = { version = "3.1.0", features = ["serde", "loop_controls"] }

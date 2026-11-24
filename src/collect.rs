@@ -15,6 +15,9 @@ use crate::Paths;
 pub struct RepoConfig {
     /// Leave the repo out of the wiki.
     pub skip: bool,
+    /// Display name in the header, sidebar and home page; default: the repo
+    /// name without its pull group (`notes-ios` for `fossify-ios/notes-ios`).
+    pub title: Option<String>,
     /// Group label for the wiki header's dropdowns; default: the pull group
     /// (`fossify-ios` for `fossify-ios/notes-ios`), else "Other".
     pub category: Option<String>,

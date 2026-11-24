@@ -48,6 +48,7 @@ Per-repo settings, keyed by pull repo name; all optional. The full list is at th
 skip = true                            # leave the repo out
 
 [repos.ycode]
+title = "ycode"                       # display name (default: the repo name without its pull group)
 category = "ycode"                     # header dropdown and home page section (default: the pull group, else "Other")
 description = "A Zed fork you can script in Lua."   # home page blurb (default: the README's first sentence)
 rust = { packages = ["lua_hooks"] }    # cargo doc -p ... (default: default-members)
@@ -55,7 +56,7 @@ rust = { packages = ["lua_hooks"] }    # cargo doc -p ... (default: default-memb
 # lua = { files = ["lib"] }  /  js = { files = ["src"] }  /  rust = false
 ```
 
-Repos in a pull group (`fossify-ios/notes-ios`) are listed by their own name (`notes-ios`) under the group's category. A long README sentence is cut at its first comma for the home page.
+Repos in a pull group (`fossify-ios/notes-ios`) are listed by their own name (`notes-ios`) under the group's category unless they set `title`/`category`. A long README sentence is cut at its first comma for the home page.
 
 ## Languages
 

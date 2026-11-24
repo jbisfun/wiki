@@ -3,6 +3,7 @@
 # code docs from the tools it is detected for (see docs/README.md).
 #
 #   skip = true                         leave the repo out of the wiki
+#   title = "..."                       display name (default: the repo name without its pull group)
 #   category = "..."                    header dropdown (default: the pull group, else "Other")
 #   description = "..."                 one line for the home page (default: the README's first sentence)
 #   rust = false | { packages = [..] }  cargo doc --no-deps (default: default-members)
@@ -74,8 +75,92 @@ category = "Apple platform"
 description = "FairPlay IPA decryption on device, split out of LiveContainer."
 category = "Apple platform"
 
+# FossiOS: the Fossify apps ported to iOS.
+
+[repos."fossify-ios/browser-ios"]
+title = "Browser"
+category = "FossiOS"
+
+[repos."fossify-ios/calculator-ios"]
+title = "Calculator"
+category = "FossiOS"
+
+[repos."fossify-ios/calendar-ios"]
+title = "Calendar"
+category = "FossiOS"
+
+[repos."fossify-ios/camera-ios"]
+title = "Camera"
+category = "FossiOS"
+
+[repos."fossify-ios/clock-ios"]
+title = "Clock"
+category = "FossiOS"
+
+[repos."fossify-ios/commons-ios"]
+title = "Commons"
+category = "FossiOS"
+
+[repos."fossify-ios/contacts-ios"]
+title = "Contacts"
+category = "FossiOS"
+
+[repos."fossify-ios/documents-ios"]
+title = "Documents"
+category = "FossiOS"
+
+[repos."fossify-ios/file-manager-ios"]
+title = "File Manager"
+category = "FossiOS"
+
+[repos."fossify-ios/gallery-ios"]
+title = "Gallery"
+category = "FossiOS"
+
+[repos."fossify-ios/keyboard-ios"]
+title = "Keyboard"
+category = "FossiOS"
+
+[repos."fossify-ios/launcher-ios"]
+title = "Launcher"
+category = "FossiOS"
+
+[repos."fossify-ios/messages-ios"]
+title = "Messages"
+category = "FossiOS"
+
+[repos."fossify-ios/music-player-ios"]
+title = "Music Player"
+category = "FossiOS"
+
+[repos."fossify-ios/notes-ios"]
+title = "Notes"
+category = "FossiOS"
+
+[repos."fossify-ios/paint-ios"]
+title = "Paint"
+category = "FossiOS"
+
+[repos."fossify-ios/phone-ios"]
+title = "Phone"
+category = "FossiOS"
+
+[repos."fossify-ios/settings-ios"]
+title = "Settings"
+category = "FossiOS"
+
+[repos."fossify-ios/thank-you-ios"]
+title = "Thank You"
+category = "FossiOS"
+
+[repos."fossify-ios/voice-recorder-ios"]
+title = "Voice Recorder"
+category = "FossiOS"
+
 [repos."fossify-ios/widgets-ios"]
-description = "The Fossify apps' home-screen widgets, as a WidgetKit extension."
+title = "Widgets"
+category = "FossiOS"
+description = "The FossiOS apps' home-screen widgets, as a WidgetKit extension."
 
 [repos.idl]
 description = "Builds iOS apps on Linux from one idlproj.yml."
