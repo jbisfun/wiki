@@ -1,0 +1,33 @@
+---
+title: 範本
+---
+<h1>範本</h1>
+<p>儲存庫的 <code>docs/</code>（或 <code>wiki/pages/</code>）中的任何 <code>.jinja</code> 檔案都是一個頁面，使用 <a href="https://github.com/mitsuhiko/minijinja">minijinja</a>（Jinja2 語法）渲染。本頁是 <code>wiki/docs/templating.jinja</code>。版面配置與局部範本位於 <code>wiki/templates</code>。</p>
+
+<h2>標籤</h2>
+<table class="table table-sm">
+  <tr><td><code>{% raw %}{% for x in xs %}{% endfor %}{% endraw %}</code></td><td>陳述式（迴圈、if、<code>set</code>）</td></tr>
+  <tr><td><code>{% raw %}{{ value }}{% endraw %}</code></td><td>輸出，並進行 HTML 跳脫</td></tr>
+  <tr><td><code>{% raw %}{{ html | safe }}{% endraw %}</code></td><td>輸出原始 HTML</td></tr>
+  <tr><td><code>{% raw %}{% include "partials/footer.html" %}{% endraw %}</code></td><td>引入 <code>wiki/templates</code> 中的範本</td></tr>
+</table>
+
+<h2>變數</h2>
+<ul>
+  <li><code>site</code>：<code>title</code>、<code>home</code>（此語言的首頁）、<code>lang</code>、<code>repos</code>、<code>pages</code>（<code>{title, out}</code>）</li>
+  <li><code>repo</code>：目前的儲存庫（<code>name</code>、<code>title</code>（不含 pull 群組的名稱）、<code>category</code>、<code>description</code>、<code>index</code>、<code>readme_page</code>、<code>doc_pages</code>、<code>apis</code>（<code>{tool, title, label, out}</code>）、<code>web</code>、<code>head</code>、...）</li>
+  <li><code>page</code>：<code>title</code>、<code>out</code>、<code>rel</code>、<code>lang</code>、<code>translation</code>（<code>"machine"</code>、<code>"missing"</code> 或無）、<code>original</code>（英文頁面）、<code>alternates</code>（<code>{lang, name, out, current}</code>），front matter 為 <code>page.data</code></li>
+  <li><code>t(key, **args)</code>：頁面語言在 <code>locales/&lt;lang&gt;/main.ftl</code> 中的訊息</li>
+  <li><code>url(path)</code>：從本頁連結過去的網站相對路徑</li>
+  <li><code>md(source)</code>：渲染 markdown</li>
+</ul>
+<p>Front matter 中的 <code>layout: false</code> 會略過 <code>templates/layout.html</code>；<code>layout: other.html</code> 則改用另一個版面配置。Markdown 頁面可以用 <code>jinja: true</code> 選擇啟用 Jinja。範本頁面在每次建置時都會渲染，因為它們可以顯示網站的任何資訊。</p>
+
+<h2>即時範例</h2>
+<p>此工作區有 {{ site.repos | length }} 個儲存庫和 {{ site.pages | length }} 個頁面：</p>
+<ul>
+{% for r in site.repos %}
+  <li><a href="{{ url(r.index) }}">{{ r.name }}</a>：{{ r.doc_pages | length }} 個文件頁面，{{ r.apis | length }} 個程式碼參考</li>
+{% endfor %}
+</ul>
+{{ md('Rendered by `md()` from **markdown** inside a template.') }}

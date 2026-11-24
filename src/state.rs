@@ -67,6 +67,11 @@ pub fn file_id(path: &Path) -> String {
     Oid::hash_file(ObjectType::Blob, path).map(|oid| oid.to_string()).unwrap_or_default()
 }
 
+/// Blob id of a text (`git hash-object` of a file with this content).
+pub fn text_id(text: &str) -> String {
+    Oid::hash_object(ObjectType::Blob, text.as_bytes()).map(|oid| oid.to_string()).unwrap_or_default()
+}
+
 /// Blob ids of every file under `dir`, as "relative path\0id" parts.
 pub fn dir_ids(dir: &Path) -> Vec<String> {
     let mut parts: Vec<String> = walkdir::WalkDir::new(dir)

@@ -1,4 +1,5 @@
 <h1>{{ repo.title }}</h1>
-<p class="lead">
-  <code>{{ repo.name }}</code> has no README.md{% if repo.web %}; source in <a href="{{ repo.web }}">{{ repo.web | replace('https://', '') }}</a>{% endif %}.
-</p>
+<p class="lead">{{ t('no-readme') }}</p>
+{% if repo.web %}
+<p>{{ t('source-in') }} <a href="{{ repo.web }}">{{ repo.web | replace('https://', '') }}</a></p>
+{% endif %}

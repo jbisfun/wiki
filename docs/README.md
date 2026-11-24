@@ -22,7 +22,8 @@
    - `*.jinja` with [minijinja](https://github.com/mitsuhiko/minijinja). See [Templating](templating.jinja).
    - Every other file in `docs/` is copied as an asset.
    - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL). Links are rewritten with lol_html, so links in raw HTML are covered too.
-5. **Publish** (`wiki publish`): mirrors `dist/` into the `jbisfun.github.io` repo with rsync and stages it.
+5. **Languages** (`i18n.rs`, `translate.rs`): Step 4 runs once per language in `wiki.toml` `[i18n]`; see [Languages](#languages).
+6. **Publish** (`wiki publish`): mirrors `dist/` into the `jbisfun.github.io` repo with rsync and stages it.
 
 ## What gets regenerated
 
@@ -32,7 +33,8 @@ Inputs are identified the way git identifies them (`state.rs`), and `.build/stat
 | - | - |
 | A repo's code reference | the repo's HEAD tree id, the patch id of its uncommitted changes, or its `wiki.toml` settings |
 | A repo's pages | the blob id of any of its page sources, its code reference keys, or the global key |
-| Everything | the global key: blob ids of `templates/`, the list of repos in the navbar, the site title, or the `wiki` binary |
+| A repo's pages in another language | the same, plus its translations and translated strings |
+| Everything | the global key: blob ids of `templates/` and `locales/`, the locale list, the list of repos in the navbar, the site title, or the `wiki` binary |
 | `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `wiki` binary |
 
 `.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `wiki build --force` (`just rebuild`) ignores the state.
@@ -55,6 +57,16 @@ rust = { packages = ["lua_hooks"] }    # cargo doc -p ... (default: default-memb
 
 Repos in a pull group (`fossify-ios/notes-ios`) are listed by their own name (`notes-ios`) under the group's category. A long README sentence is cut at its first comma for the home page.
 
+## Languages
+
+English is the source language, at the site root. Every locale in `[i18n] locales` (now `zh-TW`) is a full copy of the site under its lowercased tag (`/zh-tw/...`), with a language menu in the header and `hreflang` links between the copies. Code references stay English and are shared.
+
+- **Chrome** (navbar, sidebar, footer, home page): [Fluent](https://projectfluent.org) messages in `locales/<tag>/main.ftl`, loaded with fluent-templates. Templates call `t('key', name=value)`. A new locale needs a `locales/<tag>/main.ftl` with every key in `locales/en/main.ftl`.
+- **Pages** (READMEs, `docs/`) and the `wiki.toml` descriptions and categories are machine-translated through any OpenAI-compatible chat API (`[i18n.translator]`: `base_url`, `model`, `api_key_env`, `reasoning_effort`, `jobs`, `chunk`; local Ollama by default), with async-openai. Pages are split along their markdown structure (text-splitter) into chunks of at most `chunk` characters; the prompt keeps code, links, HTML and template tags as they are.
+- **Cache**: `translations/<tag>/<repo>/<path>` plus `sources.json` (page -> blob id of the English it came from) and `strings.json`, committed with the wiki. A page goes back to the translator only when its English blob id changes; until then the old translation is shown (with a warning in the build log). Translations of deleted pages are pruned.
+- `WIKI_TRANSLATE=0`, or a translator that can't be reached, builds from the cache alone: pages without a translation are shown in English with a notice. Translated pages carry a "machine-translated" notice linking the English original, and Radar is English-only.
+- `translate = false` or `translate = { files = ["README.md"] }` in a repo's table limits what gets translated (ycode's upstream Zed docs and the radar reports in `issues` stay English).
+
 ## Commands
 
 ```sh
@@ -65,7 +77,7 @@ just serve     # build and serve dist/ on http://localhost:8000
 just clean
 ```
 
-Environment: `PULL_ROOT` (workspace root, default `..`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`.
+Environment: `PULL_ROOT` (workspace root, default `..`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`, `WIKI_TRANSLATE=0` (no translator calls), and the variable named by `[i18n.translator] api_key_env`.
 
 ## pull hook
 

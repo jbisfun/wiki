@@ -23,6 +23,9 @@ pub struct RepoConfig {
     pub rust: Tool,
     pub lua: Tool,
     pub js: Tool,
+    /// Machine-translate the README and docs into the wiki.toml `[i18n]`
+    /// languages; `{ files = [..] }` limits it to matching paths.
+    pub translate: Tool,
 }
 
 /// `tool = false` turns a doc tool off; a table configures it.
@@ -56,6 +59,7 @@ pub struct ToolSettings {
     /// rust: cargo packages (`-p`); default: the workspace's default members.
     pub packages: Vec<String>,
     /// lua/js: pathspecs of tracked files; default: every tracked file of the language.
+    /// translate: pathspecs of pages; default: all of them.
     pub files: Vec<String>,
 }
 

@@ -14,9 +14,10 @@ title: Templating
 
 <h2>Variables</h2>
 <ul>
-  <li><code>site</code>: <code>title</code>, <code>repos</code>, <code>pages</code> (<code>{title, out}</code>)</li>
+  <li><code>site</code>: <code>title</code>, <code>home</code> (this language's home page), <code>lang</code>, <code>repos</code>, <code>pages</code> (<code>{title, out}</code>)</li>
   <li><code>repo</code>: the current repo (<code>name</code>, <code>title</code> (name without its pull group), <code>category</code>, <code>description</code>, <code>index</code>, <code>readme_page</code>, <code>doc_pages</code>, <code>apis</code> (<code>{tool, title, label, out}</code>), <code>web</code>, <code>head</code>, ...)</li>
-  <li><code>page</code>: <code>title</code>, <code>out</code>, <code>rel</code>, front matter as <code>page.data</code></li>
+  <li><code>page</code>: <code>title</code>, <code>out</code>, <code>rel</code>, <code>lang</code>, <code>translation</code> (<code>"machine"</code>, <code>"missing"</code> or none), <code>original</code> (the English page), <code>alternates</code> (<code>{lang, name, out, current}</code>), front matter as <code>page.data</code></li>
+  <li><code>t(key, **args)</code>: a message from <code>locales/&lt;lang&gt;/main.ftl</code> in the page's language</li>
   <li><code>url(path)</code>: site-relative path to a link from this page</li>
   <li><code>md(source)</code>: render markdown</li>
 </ul>

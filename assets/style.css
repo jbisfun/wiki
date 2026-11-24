@@ -1,48 +1,381 @@
-/* Bundled by lightningcss; the code highlighting CSS is generated from syntect themes. */
+/* Bundled by lightningcss; the code highlighting CSS is generated from syntect themes.
+   Look: an Apple internal web tool, circa 2010-2014. Graphite global bar,
+   source-list sidebar, white sheets on a pinstripe desk, Lucida Grande/Helvetica,
+   glossy gradients, letterpress text shadows. Dark mode is the "pro app"
+   graphite variant (Aperture / Final Cut Pro X). */
 @import "../node_modules/bootstrap/dist/css/bootstrap.css";
 
-/* Header */
-.navbar .nav-link.active { font-weight: 600; }
-.navbar .dropdown-menu { max-height: 70vh; overflow-y: auto; }
+:root, [data-bs-theme="light"] {
+  --wiki-font: "Lucida Grande", "Lucida Sans Unicode", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --wiki-head-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --wiki-mono: Menlo, Monaco, "DejaVu Sans Mono", Consolas, monospace;
 
-/* Repo sidebar */
-.wiki-sidebar { font-size: 0.9rem; }
+  --wiki-desk: #e3e5e8;
+  --wiki-stripe: rgba(255, 255, 255, 0.35);
+  --wiki-sheet: #fff;
+  --wiki-sheet-border: #b9bcc1;
+  --wiki-emboss: 0 1px 0 rgba(255, 255, 255, 0.85);
+
+  --wiki-source-bg: #dde3ea;
+  --wiki-source-head: #5c6a7a;
+  --wiki-source-text: #1e2a36;
+  --wiki-select-top: #6ea4e2;
+  --wiki-select-bottom: #2c6fc7;
+  --wiki-select-border: #2763b4;
+
+  --wiki-pill-top: #a2abb8;
+  --wiki-pill-bottom: #7d8899;
+
+  --wiki-code-bg: #f7f8fa;
+  --wiki-code-border: #d3d6db;
+  --wiki-zebra: #e8f0fd;
+
+  --bs-body-font-family: var(--wiki-font);
+  --bs-font-monospace: var(--wiki-mono);
+  --bs-body-font-size: 0.875rem;
+  --bs-body-color: #222;
+  --bs-body-bg: var(--wiki-desk);
+  --bs-secondary-color: #6b7078;
+  --bs-border-color: #c8cbd0;
+  --bs-link-color: #0b5fbf;
+  --bs-link-color-rgb: 11, 95, 191;
+  --bs-link-hover-color: #0846a0;
+  --bs-link-hover-color-rgb: 8, 70, 160;
+  --bs-tertiary-bg: var(--wiki-code-bg);
+  --bs-border-radius: 4px;
+}
+
+[data-bs-theme="dark"] {
+  --wiki-desk: #1e1f21;
+  --wiki-stripe: rgba(255, 255, 255, 0.025);
+  --wiki-sheet: #36383b;
+  --wiki-sheet-border: #141415;
+  --wiki-emboss: 0 -1px 0 rgba(0, 0, 0, 0.7);
+
+  --wiki-source-bg: #2a2c30;
+  --wiki-source-head: #a3a9b2;
+  --wiki-source-text: #d6d8db;
+  --wiki-select-top: #5d7fa8;
+  --wiki-select-bottom: #3a5a82;
+  --wiki-select-border: #2b4567;
+
+  --wiki-pill-top: #8a919c;
+  --wiki-pill-bottom: #666c76;
+
+  --wiki-code-bg: #28292b;
+  --wiki-code-border: #18191a;
+  --wiki-zebra: #3f4247;
+
+  --bs-body-color: #d9dadc;
+  --bs-body-bg: var(--wiki-desk);
+  --bs-secondary-color: #959aa2;
+  --bs-border-color: #4a4c50;
+  --bs-link-color: #7fb2ef;
+  --bs-link-color-rgb: 127, 178, 239;
+  --bs-link-hover-color: #a9cbf5;
+  --bs-link-hover-color-rgb: 169, 203, 245;
+  --bs-tertiary-bg: var(--wiki-code-bg);
+}
+
+body {
+  font-family: var(--wiki-font);
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--wiki-desk);
+  /* Pinstripes, like the Aqua-era window backgrounds. */
+  background-image: repeating-linear-gradient(0deg, var(--wiki-stripe) 0 2px, transparent 2px 4px);
+}
+
+h1, h2, h3, h4, h5, h6 { font-family: var(--wiki-head-font); font-weight: 700; letter-spacing: -0.01em; }
+code, kbd, pre, samp { font-family: var(--wiki-mono); }
+
+/* Global bar: graphite gradient with etched dividers, apple.com/developer style. */
+.navbar.wiki-globalnav {
+  --bs-navbar-padding-y: 0;
+  --bs-navbar-color: #f0f0f0;
+  --bs-navbar-hover-color: #fff;
+  --bs-navbar-active-color: #fff;
+  --bs-navbar-brand-color: #fff;
+  --bs-navbar-brand-hover-color: #fff;
+  --bs-navbar-nav-link-padding-x: 1.1rem;
+  min-height: 2.6rem;
+  background: linear-gradient(#5f6268, #404348 50%, #34373b 51%, #2b2d31);
+  border-bottom: 1px solid #111;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 3px rgba(0, 0, 0, 0.35);
+  font-family: var(--wiki-head-font);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.75);
+}
+.wiki-globalnav .navbar-brand {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 1.1rem 0.55rem 0;
+  margin-right: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+.wiki-globalnav .navbar-nav { margin-left: 0 !important; }
+.wiki-globalnav .navbar-nav .nav-link {
+  font-size: 0.8rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+.wiki-globalnav .navbar-nav .nav-link:hover,
+.wiki-globalnav .navbar-nav .nav-link.show {
+  background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+}
+.wiki-globalnav .navbar-nav .nav-link.active {
+  font-weight: 700;
+  background: linear-gradient(#26282b, #313337);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.65), 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+.wiki-globalnav .navbar-toggler { border-color: rgba(0, 0, 0, 0.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15); }
+
+/* Menus: Mac menus with the blue highlight and a checkmark on the current item. */
+.dropdown-menu {
+  --bs-dropdown-bg: rgba(250, 250, 250, 0.97);
+  --bs-dropdown-color: #111;
+  --bs-dropdown-border-color: rgba(0, 0, 0, 0.25);
+  --bs-dropdown-border-radius: 5px;
+  --bs-dropdown-font-size: 0.8125rem;
+  --bs-dropdown-link-color: #111;
+  --bs-dropdown-link-hover-color: #fff;
+  --bs-dropdown-link-active-color: #111;
+  --bs-dropdown-link-active-bg: transparent;
+  --bs-dropdown-header-color: #8a8a8a;
+  --bs-dropdown-item-padding-y: 0.2rem;
+  --bs-dropdown-item-padding-x: 1.4rem;
+  font-family: var(--wiki-font);
+  text-shadow: none;
+  padding: 0.3rem 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.wiki-globalnav .dropdown-menu { max-height: 70vh; overflow-y: auto; margin-top: 0 !important; border-top-left-radius: 0; border-top-right-radius: 0; }
+.dropdown-item { position: relative; }
+.dropdown-item:hover, .dropdown-item:focus { background: linear-gradient(#6a9df0, #2f6fe0); color: #fff; }
+.dropdown-item.active { font-weight: 700; }
+.dropdown-item.active::before { content: "\2713"; position: absolute; left: 0.45rem; }
+
+/* Repo sidebar: Finder/iTunes source list. */
+.wiki-sidebar {
+  font-size: 0.8125rem;
+  background: var(--wiki-source-bg);
+  border-right: 1px solid var(--wiki-sheet-border) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.35);
+  color: var(--wiki-source-text);
+}
 @media (min-width: 992px) {
   .wiki-sidebar {
     position: sticky;
-    top: 3.5rem;
-    height: calc(100vh - 3.5rem);
+    top: 2.6rem;
+    height: calc(100vh - 2.6rem);
     overflow-y: auto;
   }
 }
 .wiki-sidebar ul, .wiki-sidebar ol { list-style: none; padding-left: 0.9rem; margin-bottom: 0.25rem; }
 .wiki-sidebar > ul, .wiki-sidebar > ol { padding-left: 0; }
-.wiki-sidebar h1 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--bs-secondary-color); margin: 1rem 0 0.35rem; }
+.wiki-sidebar h1 {
+  font-family: var(--wiki-font);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wiki-source-head);
+  text-shadow: var(--wiki-emboss);
+  margin: 1.1rem 0 0.3rem;
+}
 .wiki-sidebar hr { margin: 0.75rem 0; }
-.wiki-sidebar a { text-decoration: none; color: var(--bs-body-color); display: inline-block; padding: 0.1rem 0; }
-.wiki-sidebar a:hover { color: var(--bs-link-color); }
-.wiki-sidebar a.active { color: var(--bs-link-color); font-weight: 600; }
+.wiki-sidebar a {
+  text-decoration: none;
+  color: var(--wiki-source-text);
+  display: block;
+  padding: 0.12rem 0.45rem;
+  margin: 0 -0.45rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  text-shadow: var(--wiki-emboss);
+}
+.wiki-sidebar li:has(> a + .badge) { display: flex; align-items: center; gap: 0.4rem; }
+.wiki-sidebar li:has(> a + .badge) > a { flex: 1 1 auto; }
+.wiki-sidebar a:hover { background: rgba(0, 0, 0, 0.06); }
+.wiki-sidebar a.active {
+  color: #fff;
+  font-weight: 700;
+  background: linear-gradient(var(--wiki-select-top), var(--wiki-select-bottom));
+  border-color: var(--wiki-select-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+.wiki-sidebar .fw-semibold { color: var(--wiki-source-head); text-shadow: var(--wiki-emboss); }
 
-/* Page content; the footer stays at the bottom of short pages. */
-.wiki-content { max-width: 60rem; min-height: calc(100vh - 3.5rem); display: flex; flex-direction: column; }
+/* Count pills (Mail unread badges). */
+.badge.text-bg-secondary {
+  color: #fff !important;
+  background: linear-gradient(var(--wiki-pill-top), var(--wiki-pill-bottom)) !important;
+  border-radius: 999px;
+  font-family: var(--wiki-head-font);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.25em 0.6em;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/* Page content: a white sheet lying on the desk; the footer stays at the
+   bottom of short pages. Beside the sidebar the sheet is narrowed by its own
+   left margin so the grid row doesn't wrap. */
+.wiki-content {
+  max-width: 60rem;
+  min-height: calc(100vh - 2.6rem - 2.5rem);
+  margin-block: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--wiki-sheet);
+  border: 1px solid var(--wiki-sheet-border);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  line-height: 1.6;
+}
+@media (min-width: 992px) {
+  .row:has(> .wiki-sidebar) > .wiki-content { margin-inline: 1.25rem; width: calc(75% - 2.5rem); max-width: 72rem; }
+}
+@media (min-width: 1200px) {
+  .row:has(> .wiki-sidebar) > .wiki-content { width: calc(83.33333% - 2.5rem); }
+}
 .wiki-content > footer { margin-top: auto !important; }
 .wiki-content.wiki-wide { max-width: 84rem; }
-.wiki-content pre { background: var(--bs-tertiary-bg); padding: 0.75rem 1rem; border-radius: var(--bs-border-radius); }
-.wiki-content blockquote { border-left: 0.25rem solid var(--bs-border-color); padding-left: 1rem; color: var(--bs-secondary-color); }
-.wiki-content img { max-width: 100%; height: auto; }
+.wiki-content h1 {
+  font-size: 1.75rem;
+  color: var(--bs-emphasis-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.wiki-content h2 { font-size: 1.3rem; }
+.wiki-content h3 { font-size: 1.1rem; }
 .wiki-content h2, .wiki-content h3 { margin-top: 2rem; }
-.wiki-content .anchor { text-decoration: none; margin-left: 0.4rem; visibility: hidden; }
+.wiki-content .lead { font-size: 1rem; color: var(--bs-secondary-color); }
+.wiki-content pre {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  background: var(--wiki-code-bg);
+  border: 1px solid var(--wiki-code-border);
+  border-radius: 4px;
+  padding: 0.65rem 0.9rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.wiki-content :not(pre) > code {
+  font-size: 0.8em;
+  color: inherit;
+  background: var(--wiki-code-bg);
+  border: 1px solid var(--wiki-code-border);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+}
+.wiki-content blockquote {
+  border-left: 3px solid var(--wiki-select-bottom);
+  background: var(--wiki-zebra);
+  padding: 0.5rem 1rem;
+  border-radius: 0 4px 4px 0;
+  color: var(--bs-body-color);
+}
+.wiki-content blockquote > :last-child { margin-bottom: 0; }
+.wiki-content img { max-width: 100%; height: auto; }
+.wiki-content .anchor { text-decoration: none; margin-left: 0.4rem; visibility: hidden; color: var(--bs-secondary-color); }
 .wiki-content .anchor::before { content: "#"; }
 .wiki-content :is(h1, h2, h3, h4, h5, h6):hover .anchor { visibility: visible; }
+
+/* Tables: Finder list view, gradient column headers and blue zebra rows. */
+.wiki-content .table {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: transparent;
+  border: 1px solid var(--bs-border-color);
+  font-size: 0.8125rem;
+}
+.wiki-content .table > :not(caption) > * > * { padding: 0.3rem 0.6rem; border-bottom-width: 0; }
+.wiki-content .table thead th {
+  font-weight: 400;
+  color: #333;
+  background: linear-gradient(#fdfdfd, #e3e3e3);
+  border-bottom: 1px solid #b4b4b4;
+  border-right: 1px solid #cfcfcf;
+  text-shadow: 0 1px 0 #fff;
+}
+[data-bs-theme="dark"] .wiki-content .table thead th {
+  color: #ddd;
+  background: linear-gradient(#4a4c50, #3a3c40);
+  border-color: #222;
+  text-shadow: 0 -1px 0 #000;
+}
+.wiki-content .table tbody tr:nth-child(even) > * { background: var(--wiki-zebra); }
+
+/* Home page: repo cards are small sheets, category headings are etched labels. */
+.card {
+  --bs-card-bg: var(--wiki-sheet);
+  --bs-card-border-color: var(--wiki-sheet-border);
+  --bs-card-border-radius: 5px;
+  background: linear-gradient(var(--wiki-sheet) 70%, var(--wiki-code-bg));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.15s;
+}
+.card:hover { box-shadow: 0 0 0 3px rgba(80, 140, 230, 0.45), 0 1px 2px rgba(0, 0, 0, 0.12); }
+.card-title a { font-family: var(--wiki-head-font); font-weight: 700; }
+.wiki-wide h2 {
+  font-size: 0.75rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bs-secondary-color);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding-bottom: 0.3rem;
+}
+
+/* Aqua-era push buttons. */
+.btn {
+  --bs-btn-font-size: 0.8125rem;
+  --bs-btn-border-radius: 4px;
+  font-family: var(--wiki-font);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.btn-outline-secondary {
+  --bs-btn-color: #222;
+  --bs-btn-border-color: #8e9196;
+  --bs-btn-hover-color: #111;
+  --bs-btn-hover-border-color: #7d8085;
+  background: linear-gradient(#fff, #dcdcdc);
+  text-shadow: 0 1px 0 #fff;
+}
+.wiki-globalnav .btn-outline-secondary {
+  color: #fff;
+  background: linear-gradient(#6a6d72, #45484c);
+  border-color: #1c1d1f;
+  text-shadow: 0 -1px 0 #000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Notes (machine translation etc.): pale-yellow sticky notes. */
+.alert-secondary {
+  --bs-alert-bg: #fdf8d6;
+  --bs-alert-border-color: #e1d48a;
+  --bs-alert-color: #5a4e12;
+}
+[data-bs-theme="dark"] .alert-secondary {
+  --bs-alert-bg: #3d3a28;
+  --bs-alert-border-color: #5a5530;
+  --bs-alert-color: #e6dca6;
+}
+
+.wiki-content > footer { font-size: 0.75rem; }
 
 /* The header embedded in rustdoc/LDoc pages lives in a shadow root (see
    partials/apidoc-header.html), so these rules only reach it, never the doc
    page. Bootstrap's font variables sit on :root, which a shadow root doesn't
    have, so the font is spelled out. */
 .wiki-shadow {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
-  font-size: 1rem;
+  font-family: "Lucida Grande", "Lucida Sans Unicode", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.875rem;
   line-height: 1.5;
   color: var(--bs-body-color);
   text-align: left;
+  -webkit-font-smoothing: antialiased;
 }

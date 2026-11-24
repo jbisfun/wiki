@@ -5,6 +5,10 @@
 //! all its page sources, its code reference keys, its settings, and the global
 //! key (templates, the repo list in the navbar, the wiki binary). `.jinja`
 //! pages can show anything about the site, so they are rendered every time.
+//!
+//! The site is rendered once per language (see [`crate::i18n`]): the source
+//! language at the root, every other one under its prefix with the repo pages
+//! swapped for their machine translations ([`crate::translate`]).
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,11 +21,13 @@ use regex::Regex;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::Paths;
 use crate::apidoc::{Api, copy_dir};
 use crate::collect::Repo;
+use crate::i18n::{I18n, Locale};
 use crate::markdown::{self, Markdown, SCHEME};
 use crate::state::{self, State};
+use crate::translate::{self, Cache, Job};
+use crate::{Paths, warn};
 
 static IMAGE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(png|jpe?g|gif|svg|webp|avif|ico)$").expect("valid regex"));
 static H1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^#\s+(.+?)\s*(\{#[^}]*\})?\s*$").expect("valid regex"));
@@ -127,8 +133,9 @@ struct Links {
 }
 
 impl Links {
-    /// .md links become pages; links to other repo files go to GitHub (images to their raw URL).
-    fn resolve(&self, link: &str, base: &str, from: &str) -> Option<String> {
+    /// .md links become pages (in the language `prefix`); links to other repo
+    /// files go to GitHub (images to their raw URL).
+    fn resolve(&self, link: &str, base: &str, from: &str, prefix: &str) -> Option<String> {
         if link.is_empty() || SCHEME.is_match(link) {
             return None;
         }
@@ -146,7 +153,8 @@ impl Links {
         let target = target.trim_end_matches('/');
         for candidate in [target.to_owned(), format!("{target}/README.md"), format!("{target}/readme.md"), format!("{target}/index.md")] {
             if let Some(out) = self.by_rel.get(&candidate) {
-                return Some(url(from, out) + suffix);
+                let out = if is_page(&candidate) { format!("{prefix}{out}") } else { out.clone() };
+                return Some(url(from, &out) + suffix);
             }
         }
         if target != ".." && !target.starts_with("../") {
@@ -219,8 +227,12 @@ struct RepoView {
     web: Option<String>,
     blob: Option<String>,
     head: String,
-    /// Header dropdown: wiki.toml `category`, else the pull group, else "Other".
+    /// Header dropdown: wiki.toml `category`, else the pull group, else "Other"
+    /// (translated).
     category: String,
+    /// `category` in the source language: templates group by it so every
+    /// language lists the categories in the same order.
+    category_key: String,
     description: Option<String>,
     readme_page: Option<PageRef>,
     doc_pages: Vec<PageRef>,
@@ -240,8 +252,24 @@ struct PageView<'a> {
     data: &'a Data,
     /// Plain markdown page: blocks map to source lines, so Radar works.
     radar: bool,
+    lang: &'a str,
+    /// "machine" (machine-translated) or "missing" (English shown in another language).
+    translation: Option<&'static str>,
+    /// The page in the source language, on translated pages.
+    original: Option<&'a str>,
+    /// The page in every language.
+    alternates: Vec<Alternate>,
 }
 
+#[derive(Serialize)]
+struct Alternate {
+    lang: String,
+    name: String,
+    out: String,
+    current: bool,
+}
+
+#[derive(Clone, Default)]
 struct Page {
     repo: Option<usize>,
     rel: String,
@@ -255,6 +283,11 @@ struct Page {
     readme: bool,
     /// Stand-in entry page of a repo without a README (templates/repo-index.html).
     placeholder: bool,
+    lang: String,
+    translation: Option<&'static str>,
+    original: Option<String>,
+    /// Heading ids of the source-language page, given to a translation's headings.
+    heading_ids: Option<Arc<Vec<String>>>,
 }
 
 impl Page {
@@ -262,13 +295,17 @@ impl Page {
         self.rel.ends_with(".jinja") || self.data.get("jinja").and_then(serde_json::Value::as_bool) == Some(true)
     }
 
-    fn view(&self) -> PageView<'_> {
+    fn view(&self, alternates: Vec<Alternate>) -> PageView<'_> {
         PageView {
             title: &self.title,
             out: &self.out,
             rel: &self.rel,
             data: &self.data,
-            radar: self.repo.is_some() && self.rel.ends_with(".md") && !self.is_template(),
+            radar: self.original.is_none() && self.repo.is_some() && self.rel.ends_with(".md") && !self.is_template(),
+            lang: &self.lang,
+            translation: self.translation,
+            original: self.original.as_deref(),
+            alternates,
         }
     }
 
@@ -351,30 +388,36 @@ impl<'a> SiteRepo<'a> {
                 let title = title_of(&data, &body, &rel);
                 let readme = Some(&rel) == repo.readme.as_ref();
                 site.pages.push(pages.len());
-                pages.push(Page { repo: Some(index), rel, doc_rel, out, data, source, body, title, readme, placeholder: false });
+                pages.push(Page { repo: Some(index), rel, doc_rel, out, data, source, body, title, readme, ..Default::default() });
             }
         }
         if repo.readme.is_none() {
             site.pages.insert(0, pages.len());
             pages.push(Page {
                 repo: Some(index),
-                rel: String::new(),
-                doc_rel: None,
                 out: format!("{}/index.html", repo.name),
-                data: Data::new(),
-                source: String::new(),
-                body: String::new(),
                 title: repo.name.clone(),
-                readme: false,
                 placeholder: true,
+                ..Default::default()
             });
         }
         site.key = state::key(inputs);
         Ok(Some(site))
     }
 
-    fn view(&self, pages: &[Page], markdown: &Markdown) -> RepoView {
+    /// Whether wiki.toml `translate` covers the repo file `rel`.
+    fn translates(&self, rel: &str) -> bool {
+        let Some(settings) = self.repo.config.translate.settings() else { return false };
+        settings.files.is_empty()
+            || git2::Pathspec::new(settings.files.iter())
+                .is_ok_and(|spec| spec.matches_path(Path::new(rel), git2::PathspecFlags::DEFAULT))
+    }
+
+    /// The repo as templates see it in `locale`; `strings` translates the
+    /// wiki.toml strings (descriptions, categories, book titles).
+    fn view(&self, pages: &[Page], markdown: &Markdown, locale: &Locale, i18n: &I18n, strings: &BTreeMap<String, String>) -> RepoView {
         let repo = self.repo;
+        let tr = |text: &str| strings.get(text).cloned().unwrap_or_else(|| text.to_owned());
         let readme = self.pages.iter().map(|at| &pages[*at]).find(|page| page.readme);
         let docs: Vec<(String, PageRef)> = self
             .pages
@@ -404,18 +447,25 @@ impl<'a> SiteRepo<'a> {
         RepoView {
             name: repo.name.clone(),
             title: basename(&repo.name).to_owned(),
-            index: format!("{}/index.html", repo.name),
+            index: format!("{}{}/index.html", locale.prefix, repo.name),
             web: repo.web.clone(),
             blob: self.links.blob.clone(),
             head: repo.head.clone(),
-            category: repo.config.category.as_deref().or(group).unwrap_or("Other").to_owned(),
-            description: repo.config.description.clone().or_else(|| readme.and_then(|page| markdown.blurb(&page.body))),
+            category_key: repo.config.category.as_deref().or(group).unwrap_or("Other").to_owned(),
+            category: match repo.config.category.as_deref().or(group) {
+                Some(category) => tr(category),
+                None => i18n.t(locale, "category-other"),
+            },
+            description: match &repo.config.description {
+                Some(description) => Some(tr(description)),
+                None => readme.and_then(|page| markdown.blurb(&page.body)),
+            },
             readme_page: readme.map(Page::page_ref),
             doc_pages: docs.iter().map(|(_, page)| page.clone()).collect(),
             tree: TreeNode::build(&docs),
             apis,
             api_labels,
-            book_title: self.book_title.clone(),
+            book_title: self.book_title.as_deref().map(tr),
             has_summary: self.summary.is_some(),
         }
     }
@@ -467,6 +517,7 @@ fn clear_pages(dist: &Path) -> Result<()> {
 pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, state: &mut State) -> Result<()> {
     let site_title = std::env::var("WIKI_TITLE").unwrap_or_else(|_| "jbisfun wiki".into());
     let markdown = Arc::new(Markdown::new());
+    let i18n = I18n::load(paths)?;
     let dist = &paths.dist;
 
     let mut pages: Vec<Page> = Vec::new();
@@ -481,6 +532,7 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
     let mut global_inputs = state::dir_ids(&paths.wiki.join("templates"));
     global_inputs.push(state::file_id(&std::env::current_exe()?));
     global_inputs.push(site_title.clone());
+    global_inputs.extend(i18n.input_ids(paths));
     global_inputs.extend(site_repos.iter().map(|site| site.repo.name.clone()));
     let global = state::key(global_inputs);
     if state.global != global && dist.is_dir() {
@@ -494,40 +546,46 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
         let source = fs::read_to_string(paths.wiki.join("pages").join(&rel))?;
         let (data, body) = front_matter(&source);
         let title = data.get("title").and_then(serde_json::Value::as_str).unwrap_or(&site_title).to_owned();
-        pages.push(Page { repo: None, out: out_name(&rel), rel, doc_rel: None, data, source, body, title, readme: false, placeholder: false });
+        pages.push(Page { out: out_name(&rel), rel, data, source, body, title, ..Default::default() });
+    }
+    for page in &mut pages {
+        page.lang = i18n.source().tag.clone();
     }
 
-    let views: Vec<RepoView> = site_repos.iter().map(|site| site.view(&pages, &markdown)).collect();
     let mut env = Environment::new();
     env.set_loader(path_loader(paths.wiki.join("templates")));
     env.set_auto_escape_callback(|_| AutoEscape::Html);
-    let all_pages: Vec<PageRef> = pages.iter().map(Page::page_ref).collect();
-    let site = context! { title => site_title, repos => Value::from(Serde(&views)), pages => Value::from(Serde(&all_pages)) };
-    let renderer = Renderer { env: &env, markdown: &markdown, site: &site, site_repos: &site_repos, views: &views };
+    let mut run = Run { paths, state, kept: BTreeMap::new(), changed: Vec::new(), rendered: 0, total: 0 };
+    for locale in &i18n.locales {
+        let sources = &pages;
+        let (pages, strings) = if locale.is_source() {
+            (pages.clone(), BTreeMap::new())
+        } else {
+            localize(paths, &i18n, locale, &site_repos, &pages, &markdown)?
+        };
+        let views: Vec<RepoView> = site_repos.iter().map(|site| site.view(&pages, &markdown, locale, &i18n, &strings)).collect();
+        let all_pages: Vec<PageRef> = pages.iter().map(Page::page_ref).collect();
+        let site = context! {
+            title => site_title.clone(),
+            home => format!("{}index.html", locale.prefix),
+            lang => locale.tag.clone(),
+            repos => Value::from(Serde(&views)),
+            pages => Value::from(Serde(&all_pages)),
+        };
+        let renderer = Renderer {
+            env: &env,
+            markdown: &markdown,
+            site: &site,
+            site_repos: &site_repos,
+            views: &views,
+            i18n: &i18n,
+            locale,
+            t: i18n.function(locale),
+        };
+        run.locale(&renderer, &pages, sources)?;
+    }
 
-    let mut rendered = 0;
-    let mut kept = BTreeMap::new();
-    let mut changed = Vec::new();
-    for (index, site) in site_repos.iter().enumerate() {
-        let name = &site.repo.name;
-        let fresh = state.repos.get(name) == Some(&site.key) && dist.join(name).is_dir();
-        if !fresh {
-            changed.push(name.as_str());
-            renderer.copy_files(paths, index)?;
-        }
-        for page in site.pages.iter().map(|at| &pages[*at]) {
-            if fresh && !page.is_template() {
-                continue;
-            }
-            write(dist, &page.out, &renderer.page(page)?)?;
-            rendered += 1;
-        }
-        kept.insert(name.clone(), site.key.clone());
-    }
-    for page in pages.iter().filter(|page| page.repo.is_none()) {
-        write(dist, &page.out, &renderer.page(page)?)?;
-        rendered += 1;
-    }
+    let Run { kept, changed, rendered, total, .. } = run;
     for name in state.repos.keys().filter(|name| !kept.contains_key(*name)) {
         let dir = dist.join(name);
         if dir.is_dir() {
@@ -539,8 +597,135 @@ pub fn render(paths: &Paths, repos: &[Repo], apis: &BTreeMap<String, Vec<Api>>, 
 
     let api_count: usize = site_repos.iter().map(|site| site.apis.len()).sum();
     let changed = if changed.is_empty() { "none".to_owned() } else { changed.join(", ") };
-    println!("wiki: {rendered} of {} pages rendered, {api_count} code references; regenerated repos: {changed}", pages.len());
+    println!("wiki: {rendered} of {total} pages rendered, {api_count} code references; regenerated: {changed}");
     Ok(())
+}
+
+/// Swap the repo pages for their `locale` translations (translating what's
+/// missing or outdated first) and move every page under the locale's prefix.
+/// Also returns the wiki.toml strings' translations.
+fn localize(
+    paths: &Paths,
+    i18n: &I18n,
+    locale: &Locale,
+    site_repos: &[SiteRepo],
+    pages: &[Page],
+    markdown: &Markdown,
+) -> Result<(Vec<Page>, BTreeMap<String, String>)> {
+    let mut cache = Cache::load(&paths.wiki, &locale.tag);
+    // Page index -> (cache key, English blob id) for every translatable page.
+    let mut keys: HashMap<usize, (String, String)> = HashMap::new();
+    let mut strings = BTreeSet::new();
+    let mut jobs = Vec::new();
+    for site in site_repos {
+        for at in &site.pages {
+            let page = &pages[*at];
+            if page.placeholder || !site.translates(&page.rel) {
+                continue;
+            }
+            let key = format!("{}/{}", site.repo.name, page.rel);
+            let source_id = state::text_id(&page.source);
+            if !cache.page(&key, &source_id).is_some_and(|cached| cached.current) {
+                jobs.push(Job::Page { key: key.clone(), source_id: source_id.clone(), text: page.source.clone() });
+            }
+            keys.insert(*at, (key, source_id));
+        }
+        let config = &site.repo.config;
+        let group = site.repo.name.rsplit_once('/').map(|(group, _)| group);
+        strings.extend(config.description.iter().cloned());
+        strings.extend(config.category.as_deref().or(group).map(str::to_owned));
+        strings.extend(site.book_title.iter().cloned());
+    }
+    jobs.extend(strings.iter().filter(|text| cache.string(text).is_none()).map(|text| Job::String { text: text.clone() }));
+    let repos = site_repos.iter().map(|site| site.repo.name.clone()).collect();
+    cache.prune(&repos, &keys.values().map(|(key, _)| key.clone()).collect(), &strings)?;
+    translate::run(&i18n.config.translator, &i18n.t(locale, "translator-language"), &mut cache, jobs)?;
+
+    let mut localized = Vec::with_capacity(pages.len());
+    for (at, page) in pages.iter().enumerate() {
+        let mut page = page.clone();
+        page.original = Some(page.out.clone());
+        page.out = format!("{}{}", locale.prefix, page.out);
+        page.lang = locale.tag.clone();
+        if let Some((key, source_id)) = keys.get(&at) {
+            match cache.page(key, source_id) {
+                Some(cached) => {
+                    if !cached.current {
+                        warn(format_args!("{key}: {} translation is outdated", locale.tag));
+                    }
+                    if !page.is_template() {
+                        page.heading_ids = Some(Arc::new(markdown::heading_ids(&markdown.render(&page.source))?));
+                    }
+                    let text = markdown::join_cjk_lines(&cached.text);
+                    let (data, body) = front_matter(&text);
+                    page.title = title_of(&data, &body, &page.rel);
+                    (page.data, page.body, page.source) = (data, body, text);
+                    page.translation = Some("machine");
+                }
+                None => page.translation = Some("missing"),
+            }
+        } else if page.repo.is_some() && !page.placeholder {
+            page.translation = Some("missing");
+        }
+        localized.push(page);
+    }
+    let strings = strings.into_iter().filter_map(|text| cache.string(&text).map(|done| (text.clone(), done.to_owned()))).collect();
+    Ok((localized, strings))
+}
+
+/// Bookkeeping across the languages of one render.
+struct Run<'a> {
+    paths: &'a Paths,
+    state: &'a State,
+    /// "<prefix><repo>" -> key of its rendered pages.
+    kept: BTreeMap<String, String>,
+    changed: Vec<String>,
+    rendered: usize,
+    total: usize,
+}
+
+impl Run<'_> {
+    /// Render `pages` (the site in `renderer.locale`; `sources` is the same
+    /// list in the source language).
+    fn locale(&mut self, renderer: &Renderer, pages: &[Page], sources: &[Page]) -> Result<()> {
+        let dist = &self.paths.dist;
+        let prefix = &renderer.locale.prefix;
+        self.total += pages.len();
+        for (index, site) in renderer.site_repos.iter().enumerate() {
+            let name = format!("{prefix}{}", site.repo.name);
+            let key = if renderer.locale.is_source() {
+                site.key.clone()
+            } else {
+                // Translations and translated strings are inputs too.
+                let mut inputs = vec![site.key.clone(), renderer.locale.tag.clone(), serde_json::to_string(&renderer.views[index])?];
+                inputs.extend(site.pages.iter().map(|at| state::text_id(&pages[*at].source)));
+                state::key(inputs)
+            };
+            let fresh = self.state.repos.get(&name) == Some(&key) && dist.join(&name).is_dir();
+            if !fresh {
+                if renderer.locale.is_source() {
+                    renderer.copy_files(self.paths, index)?;
+                } else if dist.join(&name).exists() {
+                    fs::remove_dir_all(dist.join(&name))?;
+                }
+                self.changed.push(name.clone());
+            }
+            for at in &site.pages {
+                let page = &pages[*at];
+                if fresh && !page.is_template() {
+                    continue;
+                }
+                write(dist, &page.out, &renderer.page_or_original(page, &sources[*at])?)?;
+                self.rendered += 1;
+            }
+            self.kept.insert(name, key);
+        }
+        for page in pages.iter().filter(|page| page.repo.is_none()) {
+            write(dist, &page.out, &renderer.page(page)?)?;
+            self.rendered += 1;
+        }
+        Ok(())
+    }
 }
 
 struct Renderer<'a> {
@@ -549,6 +734,10 @@ struct Renderer<'a> {
     site: &'a Value,
     site_repos: &'a [SiteRepo<'a>],
     views: &'a [RepoView],
+    i18n: &'a I18n,
+    locale: &'a Locale,
+    /// The template function `t(key, **args)` for `locale`.
+    t: Value,
 }
 
 impl Renderer<'_> {
@@ -606,6 +795,7 @@ impl Renderer<'_> {
             site => self.site.clone(),
             repo => Value::from(Serde(&self.views[repo])),
             url => url_function(from),
+            t => self.t.clone(),
             theme => theme,
         })?;
         // header.js measures the header into --wiki-header-height. rustdoc's sidebar is
@@ -631,18 +821,57 @@ impl Renderer<'_> {
         fs::write(path, out).with_context(|| format!("writing {}", path.display()))
     }
 
+    /// A translated page whose translation doesn't render (a Jinja page the
+    /// translator broke) falls back to the source language.
+    fn page_or_original(&self, page: &Page, source: &Page) -> Result<String> {
+        match self.page(page) {
+            Err(err) if page.translation == Some("machine") => {
+                warn(format_args!("{} ({}): {err:#}; showing the original", page.out, self.locale.tag));
+                let fallback = Page {
+                    out: page.out.clone(),
+                    lang: page.lang.clone(),
+                    original: page.original.clone(),
+                    translation: Some("missing"),
+                    ..source.clone()
+                };
+                self.page(&fallback)
+            }
+            result => result,
+        }
+    }
+
+    /// The same page in every language.
+    fn alternates(&self, page: &Page) -> Vec<Alternate> {
+        let path = page.out.strip_prefix(self.locale.prefix.as_str()).unwrap_or(&page.out);
+        self.i18n
+            .locales
+            .iter()
+            .map(|locale| Alternate {
+                lang: locale.tag.clone(),
+                name: self.i18n.t(locale, "language-name"),
+                out: format!("{}{path}", locale.prefix),
+                current: locale.tag == self.locale.tag,
+            })
+            .collect()
+    }
+
     fn page(&self, page: &Page) -> Result<String> {
         let from = page.out.as_str();
+        let prefix = self.locale.prefix.clone();
         // Markdown with the repo's links resolved from this page.
         let md = {
             let markdown = self.markdown.clone();
             let base = page.rel.rsplit_once('/').map_or(".", |(dir, _)| dir).to_owned();
             let links = page.repo.map(|at| self.site_repos[at].links.clone());
             let from = from.to_owned();
+            let heading_ids = page.heading_ids.clone();
             Arc::new(move |source: &str| -> Result<String> {
-                let html = markdown.render(source);
+                let mut html = markdown.render(source);
+                if let Some(ids) = &heading_ids {
+                    html = markdown::set_heading_ids(&html, ids)?;
+                }
                 match &links {
-                    Some(links) => markdown::rewrite_links(&html, |link| links.resolve(link, &base, &from)),
+                    Some(links) => markdown::rewrite_links(&html, |link| links.resolve(link, &base, &from, &prefix)),
                     None => Ok(html),
                 }
             })
@@ -662,9 +891,10 @@ impl Renderer<'_> {
         };
         let data = context! {
             site => self.site.clone(),
-            page => Value::from(Serde(page.view())),
+            page => Value::from(Serde(page.view(self.alternates(page)))),
             repo => page.repo.map(|at| Value::from(Serde(&self.views[at]))),
             url => url_value,
+            t => self.t.clone(),
             md => md_function,
             sidebar => Value::from_safe_string(sidebar),
         };
@@ -695,7 +925,7 @@ impl Renderer<'_> {
                 let html = self.markdown.render(&SUMMARY_H1.replace(source, ""));
                 // Summary links are relative to the docs root.
                 let base = site.docs_rel.as_deref().unwrap_or(".");
-                Some(markdown::rewrite_links(&html, |link| site.links.resolve(link, base, from))?)
+                Some(markdown::rewrite_links(&html, |link| site.links.resolve(link, base, from, &self.locale.prefix))?)
             }
             None => None,
         };
@@ -703,6 +933,7 @@ impl Renderer<'_> {
             repo => Value::from(Serde(&self.views[at])),
             summary => summary.map(Value::from_safe_string),
             url => url_value.clone(),
+            t => self.t.clone(),
         })?;
         markdown::mark_active(&html, basename(from))
     }

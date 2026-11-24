@@ -6,9 +6,11 @@
 mod apidoc;
 mod bundle;
 mod collect;
+mod i18n;
 mod markdown;
 mod render;
 mod state;
+mod translate;
 
 use std::path::{Path, PathBuf};
 use std::{env, fs};

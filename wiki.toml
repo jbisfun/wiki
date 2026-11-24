@@ -8,6 +8,21 @@
 #   rust = false | { packages = [..] }  cargo doc --no-deps (default: default-members)
 #   lua  = false | { files = [..] }     LDoc (default: tracked *.lua except *.x.lua hooks)
 #   js   = false | { files = [..] }     JSDoc (default: tracked *.js/*.mjs, needs package.json)
+#   translate = false | { files = [..] } machine-translate pages into [i18n] locales (default: all)
+
+# Languages besides English, each a full copy of the site under /<tag lowercased>/.
+# Chrome strings: locales/<tag>/main.ftl. Pages and wiki.toml strings are
+# machine-translated through an OpenAI-compatible chat API and cached in
+# translations/<tag>/ (committed), keyed by the English blob id.
+[i18n]
+locales = ["zh-TW"]
+
+[i18n.translator]
+base_url = "http://localhost:11434/v1"            # Ollama; any OpenAI-compatible API works
+model = "huihui_ai/qwen3.6-abliterated:35b-a3b"
+reasoning_effort = "none"                         # no thinking: faster, and replies are the translation only
+# api_key_env = "OPENAI_API_KEY"
+jobs = 2
 
 [repos."jbisfun.github.io"]
 skip = true # the published site itself
@@ -20,6 +35,8 @@ description = "A Zed fork you can script in Lua."
 category = "ycode"
 # The whole Zed workspace is ~250 crates; document the ycode-specific ones.
 rust = { packages = ["lua_hooks"] }
+# docs/ is upstream Zed's (1.4 MB, ~200 pages); translate only the README.
+translate = { files = ["README.md"] }
 
 [repos.ycode-hermes]
 description = "Hermes Agent as ycode's agent, over ACP."
@@ -87,6 +104,7 @@ category = "Workspace tools"
 [repos.issues]
 description = "Open radar reports for this workspace."
 category = "Workspace tools"
+translate = { files = ["README.md"] } # reports come and go; keep them in English
 
 [repos.pull]
 description = "One commit, sync and push across every repo in the workspace."

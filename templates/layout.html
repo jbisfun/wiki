@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ page.lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,6 +12,9 @@
     applyScheme();
     scheme.addEventListener("change", applyScheme);
   </script>
+{% for a in page.alternates if not a.current %}
+  <link rel="alternate" hreflang="{{ a.lang }}" href="{{ url(a.out) }}">
+{% endfor %}
   <link rel="stylesheet" href="{{ url('_assets/style.css') }}">
   <script type="module" src="{{ url('_assets/main.js') }}"></script>
 </head>
@@ -26,6 +29,11 @@
     <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content"{% if page.radar %} data-radar-repo="{{ repo.name }}" data-radar-file="{{ page.rel }}"{% endif %}>
 {% else %}
     <main class="col-xl-10 mx-auto py-4 wiki-content wiki-wide">
+{% endif %}
+{% if page.translation == "machine" %}
+      <div class="alert alert-secondary small py-2" role="note">{{ t('translated-notice') }} <a href="{{ url(page.original) }}" hreflang="en" lang="en">{{ t('translated-original') }}</a></div>
+{% elif page.translation == "missing" %}
+      <div class="alert alert-secondary small py-2" role="note">{{ t('untranslated-notice') }}</div>
 {% endif %}
       {{ content }}
 {% include "partials/footer.html" %}

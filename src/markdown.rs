@@ -75,28 +75,59 @@ impl Markdown {
             }
         }
         let text = text.trim();
-        let end = text
-            .match_indices(". ")
-            .map(|(at, _)| at + 1)
-            .next()
+        let end = [text.find(". ").map(|at| at + 1), text.find('。').map(|at| at + '。'.len_utf8())]
+            .into_iter()
+            .flatten()
+            .min()
             .unwrap_or(text.len());
         let sentence = text[..end].trim();
         if sentence.is_empty() {
             return None;
         }
-        if sentence.chars().count() > BLURB {
+        // CJK characters are about two Latin ones wide.
+        let width: usize = sentence.chars().map(|ch| if ch >= '\u{2E80}' { 2 } else { 1 }).sum();
+        if width > BLURB {
             let mut depth = 0;
             for (at, ch) in sentence.char_indices() {
                 match ch {
-                    '(' | '[' => depth += 1,
-                    ')' | ']' => depth -= 1,
+                    '(' | '[' | '（' | '「' => depth += 1,
+                    ')' | ']' | '）' | '」' => depth -= 1,
                     ',' | ';' | ':' if depth == 0 => return Some(format!("{}.", &sentence[..at])),
+                    '，' | '；' | '：' if depth == 0 => return Some(format!("{}。", &sentence[..at])),
                     _ => {}
                 }
             }
         }
         Some(sentence.to_owned())
     }
+}
+
+/// Join soft line breaks between CJK characters (outside code blocks): a
+/// browser renders a newline as a space, which CJK text doesn't have.
+pub fn join_cjk_lines(source: &str) -> String {
+    static BREAK: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"([\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}，。；：、！？）」』])\n[ \t]*([\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}（「『])")
+            .expect("valid regex")
+    });
+    let mut out = String::with_capacity(source.len());
+    let mut fenced = false;
+    let mut prose = String::new();
+    for line in source.split_inclusive('\n') {
+        if line.trim_start().starts_with("```") || line.trim_start().starts_with("~~~") {
+            if !fenced {
+                out.push_str(&BREAK.replace_all(&prose, "$1$2"));
+                prose.clear();
+            }
+            fenced = !fenced;
+            out.push_str(line);
+        } else if fenced {
+            out.push_str(line);
+        } else {
+            prose.push_str(line);
+        }
+    }
+    out.push_str(&BREAK.replace_all(&prose, "$1$2"));
+    out
 }
 
 /// Replace the mdBook preprocessor commands used by the zed docs
@@ -125,6 +156,45 @@ pub fn rewrite_links(html: &str, resolve: impl Fn(&str) -> Option<String>) -> Re
         }))
         .append_element_content_handler(element!("table", |el| {
             el.set_attribute("class", "table table-sm table-striped")?;
+            Ok(())
+        }));
+    Ok(rewrite_str(html, settings)?)
+}
+
+const HEADINGS: &str = "h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]";
+
+/// Ids of the headings in rendered HTML, in document order.
+pub fn heading_ids(html: &str) -> Result<Vec<String>> {
+    let ids = std::cell::RefCell::new(Vec::new());
+    let settings = RewriteStrSettings::new().append_element_content_handler(element!(HEADINGS, |el| {
+        ids.borrow_mut().extend(el.get_attribute("id"));
+        Ok(())
+    }));
+    rewrite_str(html, settings)?;
+    Ok(ids.into_inner())
+}
+
+/// Give the headings of `html` the ids `ids` (in order) and point their `#`
+/// links there too, so a translated page keeps the English anchors that links
+/// from other pages use. Left alone when the heading counts differ.
+pub fn set_heading_ids(html: &str, ids: &[String]) -> Result<String> {
+    let current = heading_ids(html)?;
+    if current.len() != ids.len() || current == ids {
+        return Ok(html.to_owned());
+    }
+    let map: std::collections::HashMap<&str, &str> = current.iter().map(String::as_str).zip(ids.iter().map(String::as_str)).collect();
+    let map = &map;
+    let settings = RewriteStrSettings::new()
+        .append_element_content_handler(element!(HEADINGS, move |el| {
+            if let Some(id) = el.get_attribute("id").and_then(|id| map.get(id.as_str()).copied()) {
+                el.set_attribute("id", id)?;
+            }
+            Ok(())
+        }))
+        .append_element_content_handler(element!("a[href^='#']", move |el| {
+            if let Some(id) = el.get_attribute("href").and_then(|href| map.get(&href[1..]).copied()) {
+                el.set_attribute("href", &format!("#{id}"))?;
+            }
             Ok(())
         }));
     Ok(rewrite_str(html, settings)?)

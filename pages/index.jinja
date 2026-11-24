@@ -2,9 +2,9 @@
 title: jbisfun wiki
 ---
 <h1 class="mb-3">{{ site.title }}</h1>
-<p class="lead">READMEs, docs and API references for every repo in the workspace.</p>
-{% for category, repos in site.repos | groupby("category") %}
-<h2 class="h4 mt-5 mb-3">{{ category }}</h2>
+<p class="lead">{{ t('site-lead') }}</p>
+{% for key, repos in site.repos | groupby("category_key") %}
+<h2 class="h4 mt-5 mb-3">{{ repos[0].category }}</h2>
 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
 {% for r in repos %}
   <div class="col">
@@ -17,10 +17,10 @@ title: jbisfun wiki
 {% if r.doc_pages or r.api_labels %}
         <p class="card-text small mt-auto d-flex flex-wrap gap-1">
 {% if r.doc_pages %}
-          <span class="badge text-bg-secondary">{{ r.doc_pages | length }} doc pages</span>
+          <span class="badge text-bg-secondary">{{ t('doc-pages', count=r.doc_pages | length) }}</span>
 {% endif %}
 {% for label in r.api_labels %}
-          <span class="badge text-bg-secondary">{{ label }} API</span>
+          <span class="badge text-bg-secondary">{{ t('api-badge', label=label) }}</span>
 {% endfor %}
         </p>
 {% endif %}
