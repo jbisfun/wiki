@@ -26,6 +26,5 @@
   "Zed": "Zed",
   "iOS sideloading for Linux, in Zig: daemon, CLI and GUI.": "以 Zig 實作的 iOS 側載（sideloading），包含後端程式、命令列介面與圖形使用者介面。",
   "pull's changes, commit box and jobs as ycode panels.": "以 ycode 面板呈現 pull 的變更、提交框與工作。",
-  "radar's reports as a ycode panel, filed from the editor.": "以 ycode 面板呈現 radar 回報，並可直接從編輯器提交。",
   "ycode": "ycode"
 }
