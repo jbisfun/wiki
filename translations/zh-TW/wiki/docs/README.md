@@ -1,86 +1,87 @@
 # 概覽
 
-`wiki` 會把 [pull](https://github.com/jbisfun/pull) 工作區中的每個儲存庫轉換成一個靜態網站，發佈於 <https://jbisfun.github.io>。每個儲存庫會得到：
+`wiki` 會將 [pull](https://github.com/jbisfun/pull) 工作區中的每個儲存庫轉換為單一靜態網站，並發布至 <https://jbisfun.github.io>。每個儲存庫都會獲得：
 
-- 以其 `README.md` 作為入口頁面（`<repo>/index.html`），
+- 其 `README.md` 作為首頁（`<repo>/index.html`），
 - 其 `docs/` 資料夾中的頁面（`<repo>/docs/...`），
-- 由該語言自己的工具產生的程式碼參考（`<repo>/api/...`）。
+- 由該語言自有工具產生的程式碼參考文件（`<repo>/api/...`）。
 
 ## 運作方式
 
-`wiki build`（一個 Rust 執行檔，`src/`）會執行下列步驟：
+`wiki build`（一個 Rust 二進位檔案，位於 `src/`）會執行以下步驟：
 
-1. **收集**（`collect.rs`）：執行 `pull status --json`，保留每個已複製的儲存庫，連同其 README、GitHub URL（來自 `origin` 遠端）以及 `wiki.toml` 中對應的表格。
-2. **程式碼參考**（`apidoc.rs`），輸出到 `.build/api/<repo>/<tool>/`：
-   - Rust：當儲存庫有 `Cargo.toml` 時執行 `cargo doc --no-deps`（rustdoc），並使用該儲存庫自己的 target 目錄。
-   - Lua：對受追蹤的 `*.lua` 檔案使用 [LDoc](https://github.com/lunarmodules/ldoc)（`apt install lua-ldoc`），但 `*.x.lua` 掛鉤指令碼除外。只會讀取 `---` 文件註解（檔案第一個註解上用 `-- @module name`）。
-   - JavaScript：對有 `package.json` 且含 `/** */` 註解的儲存庫，針對受追蹤的 `*.js`/`*.mjs` 使用 [JSDoc](https://jsdoc.app)（wiki 的開發相依套件）。
-   缺少工具或執行失敗只會發出警告，因此網站仍可建置。
-3. **資產**（`bundle.rs`）：內嵌的 [rolldown](https://rolldown.rs) 會連同 npm 匯入項目（Bootstrap 的 collapse 與 dropdown、clipboard.js）一起打包並壓縮 `assets/main.js`。[lightningcss](https://lightningcss.dev) 會把 `assets/style.css` 與 Bootstrap 的 CSS 打包在一起，再加上 syntect 根據其淺色與深色主題產生的程式碼醒目提示 CSS。輸出放在 `dist/_assets`。
-4. **渲染**（`render.rs`）到 `dist/<repo>/...`。mdBook 專案（有 `docs/book.toml`）會使用該書的 `src` 資料夾，並以其 `SUMMARY.md` 作為文件側邊欄。
-   - `*.md` 使用 [comrak](https://github.com/kivikakk/comrak)：GFM 表格與自動連結、智慧標點、`{#id}` 標題屬性，以及在建置時由 syntect 進行的醒目提示。每個區塊都帶有 `data-sourcepos`，因此 Radar 可以把選取範圍對應回原始碼行。
-   - `*.jinja` 使用 [minijinja](https://github.com/mitsuhiko/minijinja)。請參閱[範本](templating.jinja)。
-   - `docs/` 中的其他所有檔案都會當作資產複製。
-   - 連結會依儲存庫解析，因此 README 中連結到 `docs/setup.md` 時，會導向渲染後的頁面。連結到其他儲存庫檔案時會前往 GitHub（圖片則前往其原始 URL）。連結是用 lol_html 改寫的，因此原始 HTML 中的連結也涵蓋在內。
-5. **語言**（`i18n.rs`、`translate.rs`）：第 4 步會針對 `wiki.toml` `[i18n]` 中的每個語言各執行一次；請見[語言](#languages)。
-6. **發佈**（`wiki publish`）：以 rsync 將 `dist/` 鏡像到 `jbisfun.github.io` 儲存庫並加入暫存。
+1. **收集**（`collect.rs`）：執行 `pull status --json` 並保留每個已複製的儲存庫，包含其 README、GitHub URL（來自 `origin` 遠端）以及 `wiki.toml` 中的表格。
+2. **程式碼參考文件**（`apidoc.rs`），輸出至 `.build/api/<repo>/<tool>/`：
+   - Rust：當儲存庫含有 `Cargo.toml` 時，使用 `cargo doc --no-deps`（rustdoc），並採用該儲存庫自己的目標目錄。
+   - Lua：[LDoc](https://github.com/lunarmodules/ldoc)（`apt install lua-ldoc`）處理受追蹤的 `*.lua` 檔案，排除 `*.x.lua` 鉤腳本。僅擷取 `---` 文件註解（檔案第一個註解上的 `-- @module name`）。
+   - JavaScript：[JSDoc](https://jsdoc.app)（wiki 開發依賴套件）處理含有 `package.json` 且包含 `/** */` 註解的受追蹤 `*.js`/`*.mjs` 檔案。
+   缺少工具或執行失敗僅發出警告，因此網站仍可正常建置。
+3. **資產**（`bundle.rs`）：內嵌的 [rolldown](https://rolldown.rs) 會捆綁並壓縮 `assets/main.js` 及其 npm 依賴項（Bootstrap 的折疊與下拉選單、clipboard.js）。[lightningcss](https://lightningcss.dev) 會捆綁 `assets/style.css`，包含 Bootstrap 的 CSS，以及由 syntect 從其淺色和深色主題產生的程式碼語法高亮 CSS。輸出結果位於 `dist/_assets`。
+4. **渲染**（`render.rs`）至 `dist/<repo>/...`。mdBook 專案（含有 `docs/book.toml`）會使用該書的 `src` 資料夾及其 `SUMMARY.md` 作為文件側邊欄。
+   - `*.md` 使用 [comrak](https://github.com/kivikakk/comrak)：支援 GFM 表格和自動連結、智慧標點符號、`{#id}` 標題屬性，以及建置時由 syntect 產生的語法高亮。每個區塊都帶有 `data-sourcepos`，因此 Radar 可以將選取範圍對應回其原始行數。
+   - `*.jinja` 使用 [minijinja](https://github.com/mitsuhiko/minijinja)。請參閱 [模板](templating.jinja)。
+   - `docs/` 中的其他每個檔案都會作為資產複製。
+   - 連結會相對於儲存庫解析，因此 README 中連結至 `docs/setup.md` 的項目會導向已渲染的頁面。連結至其他儲存庫檔案的項目會導向 GitHub（圖片則導向其原始 URL）。連結會使用 lol_html 進行重寫，因此原始 HTML 中的連結也會一併處理。
+5. **語言**（`i18n.rs`、`translate.rs`）：步驟 4 會針對 `wiki.toml` `[i18n]` 中的每種語言執行一次；請參閱 [語言](#languages)。
+6. **發布**（`wiki publish`）：使用 rsync 將 `dist/` 鏡像至 `jbisfun.github.io` 儲存庫並暫存。
 
-## 哪些內容會重新產生
+## 哪些項目會重新生成
 
-輸入是以 git 識別它們的方式來識別（`state.rs`），而 `.build/state.json` 會保存每個部分上次建置時使用的鍵：
+輸入內容的識別方式與 git 相同（`state.rs`），而 `.build/state.json` 會保留每個組件上次建置時使用的金鑰：
 
-| 部分 | 下列項目變更時重新建置 |
+| 組件 | 變更時重新建置 |
 | - | - |
-| 儲存庫的程式碼參考 | 該儲存庫的 HEAD tree id、其未提交變更的 patch id，或其 `wiki.toml` 設定 |
-| 儲存庫的頁面 | 其任何頁面來源的 blob id、其程式碼參考的鍵，或全域鍵 |
-| 儲存庫在其他語言的頁面 | 同上，再加上其翻譯與翻譯後的字串 |
-| 全部 | 全域鍵：`templates/` 與 `locales/` 的 blob id、語言清單、導覽列中的儲存庫清單、網站標題，或 `wiki` 執行檔 |
-| `dist/_assets` | `assets/`、`pnpm-lock.yaml` 的 blob id，或 `wiki` 執行檔 |
+| 儲存庫的程式碼參考文件 | 儲存庫的 HEAD 樹狀結構 ID、未提交變更的 patch ID，或其 `wiki.toml` 設定 |
+| 儲存庫的頁面 | 任何頁面來源的 blob ID、其程式碼參考金鑰，或全域金鑰 |
+| 另一種語言中的儲存庫頁面 | 同上，加上其翻譯和已翻譯的字串 |
+| 所有內容 | 全域金鑰：`templates/` 和 `locales/` 的 blob ID、語系清單、導覽列中的儲存庫清單、網站標題，或 `wiki` 二進位檔案 |
+| `dist/_assets` | `assets/`、`pnpm-lock.yaml` 或 `wiki` 二進位檔案的 blob ID |
 
-`.jinja` 頁面與首頁可以顯示網站的任何資訊，因此每次建置都會渲染。`wiki build --force`（`just rebuild`）會忽略狀態。
+`.jinja` 頁面和首頁可以顯示關於網站的任何資訊，因此它們會在每次建置時渲染。`wiki build --force`（`just rebuild`）會忽略狀態。
 
 ## wiki.toml
 
-各儲存庫的設定，以 pull 儲存庫名稱為鍵；全部皆為選用。完整清單位於 [wiki.toml](../wiki.toml) 的開頭。
+每個儲存庫的設定，以拉取儲存庫名稱作為索引鍵；所有選項皆為可選。完整列表位於 [wiki.toml](../wiki.toml) 頂部。
 
 ```toml
 [repos.launchd]
-skip = true                            # leave the repo out
+skip = true                            # 將該儲存庫排除在外
 
 [repos.ycode]
-category = "ycode"                     # header dropdown and home page section (default: the pull group, else "Other")
-description = "A Zed fork you can script in Lua."   # home page blurb (default: the README's first sentence)
-rust = { packages = ["lua_hooks"] }    # cargo doc -p ... (default: default-members)
+title = "ycode"                       # 顯示名稱（預設：儲存庫名稱，不含其拉取群組）
+category = "ycode"                     # 標題下拉選單與首頁區塊（預設：拉取群組，否則為「Other」）
+description = "A Zed fork you can script in Lua."   # 首頁簡述（預設：README 的第一句話）
+rust = { packages = ["lua_hooks"] }    # cargo doc -p ...（預設：default-members）
 
 # lua = { files = ["lib"] }  /  js = { files = ["src"] }  /  rust = false
 ```
 
-位於 pull 群組中的儲存庫（`fossify-ios/notes-ios`）會以其自己的名稱（`notes-ios`）列在該群組的類別之下。過長的 README 句子在首頁會於第一個逗號處截斷。
+位於拉取群組內的儲存庫（`fossify-ios/notes-ios`）會以其自身名稱（`notes-ios`）列於該群組的分類下，除非它們設定了 `title`/`category`。長 README 句子會在其第一個逗號處截斷以用於首頁。
 
 ## 語言
 
-英文是來源語言，位於網站根目錄。`[i18n] locales` 中的每個語言（目前是 `zh-TW`）都是整個網站的完整副本，放在其小寫標籤之下（`/zh-tw/...`），頁首有語言選單，各副本之間以 `hreflang` 連結。程式碼參考維持英文並共用。
+英文是原始語言，位於網站根目錄。`[i18n] locales`（目前為 `zh-TW`）中的每個區域設定都是其小寫標籤下的完整網站副本（`/zh-tw/...`），標頭中包含語言選單，且各副本之間有 `hreflang` 連結。程式碼參考保持英文並共用。
 
-- **介面**（導覽列、側邊欄、頁尾、首頁）：`locales/<tag>/main.ftl` 中的 [Fluent](https://projectfluent.org) 訊息，透過 fluent-templates 載入。範本呼叫 `t('key', name=value)`。新增語言需要一個 `locales/<tag>/main.ftl`，包含 `locales/en/main.ftl` 中的每個鍵。
-- **頁面**（README、`docs/`）以及 `wiki.toml` 的描述與分類，會透過任何相容 OpenAI 的聊天 API 機器翻譯（`[i18n.translator]`：`base_url`、`model`、`api_key_env`、`reasoning_effort`、`jobs`、`chunk`；預設為本機 Ollama），使用 async-openai。頁面依其 markdown 結構切成最多 `chunk` 個字元的區塊（text-splitter）；提示詞要求程式碼、連結、HTML 與範本標籤保持原樣。
-- **快取**：`translations/<tag>/<repo>/<path>`，加上 `sources.json`（頁面 -> 其翻譯所根據的英文 blob id）與 `strings.json`，與 wiki 一起提交。只有當頁面的英文 blob id 改變時，才會再送去翻譯；在那之前會顯示舊的翻譯（並在建置記錄中發出警告）。已刪除頁面的翻譯會被清除。
-- `WIKI_TRANSLATE=0`，或無法連線到翻譯服務時，只從快取建置：沒有翻譯的頁面會以英文顯示並附上提示。翻譯後的頁面會附上「機器翻譯」提示並連結英文原文，Radar 只在英文頁面上提供。
-- 在儲存庫的設定表中使用 `translate = false` 或 `translate = { files = ["README.md"] }` 可限制翻譯範圍（ycode 的上游 Zed 文件與 `issues` 中的 radar 回報維持英文）。
+- **Chrome**（導航列、側邊欄、頁尾、首頁）：`locales/<tag>/main.ftl` 中的 [Fluent](https://projectfluent.org) 訊息，使用 fluent-templates 載入。模板呼叫 `t('key', name=value)`。新的區域設定需要一個 `locales/<tag>/main.ftl`，其中包含 `locales/en/main.ftl` 中的所有索引鍵。
+- **頁面**（READMEs、`docs/`）以及 `wiki.toml` 的描述與分類會透過任何 OpenAI 相容的聊天 API（`[i18n.translator]`：`base_url`、`model`、`api_key_env`、`reasoning_effort`、`jobs`、`chunk`；預設為本機 Ollama）進行機器翻譯，使用 async-openai。頁面會沿著其 markdown 結構（text-splitter）分割成最多 `chunk` 個字元的區塊；提示詞會保持程式碼、連結、HTML 和模板標籤不變。
+- **快取**：`translations/<tag>/<repo>/<path>` 加上 `sources.json`（頁面 -> 其來源英文的 blob id）與 `strings.json`，隨 wiki 一起提交。僅當頁面的英文 blob id 變更時，才會送回翻譯器；在此之前會顯示舊翻譯（在建置記錄中帶有警告）。已刪除頁面的翻譯會被修剪。
+- `WIKI_TRANSLATE=0`，或無法連線的翻譯器，會單獨從快取建置：沒有翻譯的頁面會以英文顯示並附帶通知。已翻譯的頁面帶有「機器翻譯」通知，連結至英文原文，且 Radar 僅支援英文。
+- 儲存庫表格中的 `translate = false` 或 `translate = { files = ["README.md"] }` 限制翻譯範圍（ycode 的上游 Zed 文件與 `issues` 中的雷達報告保持英文）。
 
-## 指令
+## 命令
 
 ```sh
-just build     # pnpm install, then wiki build into dist/
-just rebuild   # the same, ignoring .build/state.json
-just publish   # build, then copy into ../jbisfun.github.io and git add
-just serve     # build and serve dist/ on http://localhost:8000
+just build     # pnpm install，然後將 wiki 建置至 dist/
+just rebuild   # 相同操作，忽略 .build/state.json
+just publish   # 建置，然後複製到 ../jbisfun.github.io 並 git add
+just serve     # 建置並在 http://localhost:8000 上提供 dist/
 just clean
 ```
 
-環境變數：`PULL_ROOT`（工作區根目錄，預設為 `..`）、`WIKI_SKIP`（以逗號分隔、要排除的儲存庫，疊加在 `wiki.toml` 的 `skip` 之上）、`WIKI_TITLE`、`WIKI_PUBLISH_DIR`、`WIKI_TRANSLATE=0`（不呼叫翻譯服務），以及 `[i18n.translator] api_key_env` 所指定的變數。
+環境變數：`PULL_ROOT`（工作區根目錄，預設 `..`）、`WIKI_SKIP`（要排除的儲存庫，以逗號分隔，位於 `wiki.toml` 中的 `skip` 之上）、`WIKI_TITLE`、`WIKI_PUBLISH_DIR`、`WIKI_TRANSLATE=0`（不呼叫翻譯器），以及由 `[i18n.translator] api_key_env` 命名的變數。
 
-## pull 掛鉤
+## pull hook
 
-工作區的 `pullfile.plist` 會在 `precommit` 掛鉤中執行 `just publish`，因此 `pull commit` 會把重新產生的網站放進同一個提交的 `jbisfun.github.io` 中，而 `pull push` 則會將它部署到 GitHub Pages。
+工作區的 `pullfile.plist` 將 `just publish` 作為 `precommit` hook 執行，因此 `pull commit` 會在同一個提交中將重新產生的網站落地至 `jbisfun.github.io`，而 `pull push` 則將其部署至 GitHub Pages。
 
-撰寫頁面請參閱[範本](templating.jinja)。
+請參閱 [Templating](templating.jinja) 以撰寫頁面。

@@ -14,6 +14,7 @@
   "Hermes Agent as ycode's agent, over ACP.": "透過 ACP 將 Hermes Agent 作為 ycode 的代理程式。",
   "Mac CoreADI emulated on iOS, for anisette headers.": "在 iOS 上模擬 Mac CoreADI，用於產生 anisette 標頭。",
   "On-device App Store sign-in for iOS, split out of LiveContainer.": "iOS 裝置上的 App Store 登入，從 LiveContainer 拆分而出。",
+  "On-device sideloading for iPhone and iPad, without JIT.": "iPhone 與 iPad 的本機側載，無需 JIT。",
   "One commit, sync and push across every repo in the workspace.": "在工作區的所有儲存庫間一次提交、同步與推送。",
   "Open radar reports for this workspace.": "本工作區尚未解決的 radar 回報。",
   "Per-project Homebrew packages, declared in the pullfile.": "在 pullfile 中宣告的專案專屬 Homebrew 套件。",
@@ -23,6 +24,7 @@
   "Turns ycode's Lua mods on and off.": "開啟或關閉 ycode 的 Lua 模組。",
   "Workspace tools": "工作區工具",
   "Zed": "Zed",
+  "iOS sideloading for Linux, in Zig: daemon, CLI and GUI.": "以 Zig 實作的 iOS 側載（sideloading），包含後端程式、命令列介面與圖形使用者介面。",
   "pull's changes, commit box and jobs as ycode panels.": "以 ycode 面板呈現 pull 的變更、提交框與工作。",
   "radar's reports as a ycode panel, filed from the editor.": "以 ycode 面板呈現 radar 回報，並可直接從編輯器提交。",
   "ycode": "ycode"

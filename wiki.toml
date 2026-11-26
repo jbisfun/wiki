@@ -162,6 +162,15 @@ title = "Widgets"
 category = "FossiOS"
 description = "The FossiOS apps' home-screen widgets, as a WidgetKit extension."
 
+[repos.ferry]
+description = "iOS sideloading for Linux, in Zig: daemon, CLI and GUI."
+category = "Apple platform"
+
+[repos."ferry-ios"]
+title = "Ferry for iOS"
+description = "On-device sideloading for iPhone and iPad, without JIT."
+category = "Apple platform"
+
 [repos.idl]
 description = "Builds iOS apps on Linux from one idlproj.yml."
 category = "Apple platform"

@@ -1,98 +1,72 @@
 # 架構
 
-`idl` 是單一的 Zig 執行檔（libplist 已編譯進去；只以動態方式連結 libc）。它讀取 `idlproj.yml`，然後
-產生檔案或執行外部編譯器。它不包含
-通用的工作語言：它追蹤編譯器相依關係、準備
-經過衝突檢查的資源計畫，並快取資源與 bundle 的輸出。
+`idl` 是一個單一的 Zig 可執行檔（libplist 已編譯為靜態；僅動態連結 libc）。它讀取 `idlproj.yml`，並產生檔案或執行外部編譯器。它不包含通用的任務語言：它追蹤編譯器相依性、準備碰撞檢查的資源計畫，並快取資源與套件輸出。
 
 ```
 idlproj.yml ──► config ──► codegen ─► .xcodeproj, xtool.yml, Package.swift, compile_commands.json
                   │
                   └──► builder ─► clang / clang++ / swiftc ─► ld64.lld (xtool SDK)
-                         │            (parallel, incremental)
+                         │            (平行、增量式)
                          ├─► plist (libplist): Info.plist, entitlements
                          ├─► resources: xcstrings, ibtool (storyboard/xib ─► nib),
                          │              idl-actool (xcassets ─► Assets.car)
-                         ├─► ldid (from PATH or toolchain.ldid)
+                         ├─► ldid (來自 PATH 或 toolchain.ldid)
                          ├─► zip writer ─► .ipa
                          └─► verify: zip reader + plist + Mach-O parser
 ```
 
-## 原始碼對照
+## 來源對應表
 
 | 檔案 | 職責 |
 | --- | --- |
-| `src/main.zig` | CLI：zig-clap 頂層命令，加上每個子命令各自的解析器 |
-| `src/config.zig` | `idlproj.yml` 結構描述、合併 `defaults`、驗證、向上搜尋檔案 |
-| `src/ynode.zig` | 建立在 zig-yaml 解析樹上的無損 YAML 檢視（保留純量文字；移除註解） |
-| `src/toolchain.zig` | SDK／編譯器／ldid 探索、編譯器與連結器旗標組合、`idl check` |
-| `src/resources.zig` | 資源快取、嚴格驗證、輸出衝突計畫，以及 storyboard／nib 參照檢查 |
-| `src/buildstate.zig` | SHA-256 目錄樹指紋、快取記錄／輸出完整性，以及每個資料夾的 OS 鎖 |
-| `src/builder.zig` | 平行增量編譯、連結、bundle 組裝、簽署、封裝、xtool 執行、清除 |
-| `src/codegen.zig` | `xtool.yml`、`Package.swift`、`compile_commands.json`，以及防止覆寫非產生檔案的保護 |
-| `src/pbxproj.zig` | 具確定性的 Xcode 專案與 scheme；原子性、防符號連結的發佈 |
-| `src/metadata.zig` | 由 YAML 驅動的 Info.plist 與 entitlements，供直接建置、Xcode 與 xtool 建置共用 |
-| `src/plist.zig` | libplist 包裝層、Xcode `$(VAR)` 展開、CLI 值解析 |
-| `src/xcstrings.zig` | 將 String Catalog 轉為 `.strings` / `.stringsdict` |
-| `src/zip.zig` | 具確定性的 ZIP 寫入器（std.compress.flate）與會檢查 CRC 的讀取器 |
-| `src/macho.zig` | Mach-O 標頭與載入命令檢查 |
-| `src/verify.zig` | `build` 與 `verify` 使用的 IPA 驗證 |
-| `src/ibtool.zig` | 將 `.xib` / `.storyboard` 轉為 nib 物件圖（移植自 davidquesada/ibtool） |
+| `src/main.zig` | CLI：zig-clap 頂層指令，以及每個子指令的解析器 |
+| `src/config.zig` | `idlproj.yml` 結構定義、合併 `defaults`、驗證、向上檔案搜尋 |
+| `src/ynode.zig` | zig-yaml 解析樹的無損 YAML 檢視（保留純量文字；移除註解） |
+| `src/toolchain.zig` | SDK/編譯器/ldid 發現、編譯器與連結器旗標集合、`idl check` |
+| `src/resources.zig` | 資源快取、嚴格驗證、輸出碰撞計畫與 storyboard/nib 參考檢查 |
+| `src/buildstate.zig` | SHA-256 樹狀指紋、快取記錄/輸出完整性與每目錄 OS 鎖定 |
+| `src/builder.zig` | 平行增量編譯、連結、套件組裝、簽章、打包、xtool 執行、清理 |
+| `src/hosttest.zig` | `type: test` 目標：SwiftPM 套件（複製來源）+ `swift test`，或主機 clang 編譯與執行 |
+| `src/codegen.zig` | `xtool.yml`、`Package.swift`、`compile_commands.json`、防止覆蓋非產生檔案的保護機制 |
+| `src/pbxproj.zig` | 確定性 Xcode 專案 + 方案；原子式、符號連結安全的發布 |
+| `src/metadata.zig` | YAML 驅動的 Info.plist 與 entitlements，由直接編譯、Xcode 和 xtool 編譯共用 |
+| `src/plist.zig` | libplist 包裝函式、Xcode `$(VAR)` 展開、CLI 值解析 |
+| `src/xcstrings.zig` | String Catalog 轉為 `.strings` / `.stringsdict` |
+| `src/zip.zig` | 確定性 ZIP 寫入器（std.compress.flate）與 CRC 檢查讀取器 |
+| `src/macho.zig` | Mach-O 標頭與載入指令檢查 |
+| `src/verify.zig` | IPA 驗證，供 `build` 與 `verify` 使用 |
+| `src/ibtool.zig` | `.xib` / `.storyboard` 轉為 nib 物件圖（davidquesada/ibtool 的移植版） |
 | `src/nib.zig` | NIBArchive 物件模型、編碼器與解碼器（`idl ibtool --dump`） |
-| `src/xmldom.zig` | 建立在 zig-xml 串流讀取器上的小型 DOM |
-| `tools/idl-actool` | AssetKit 的 Swift 包裝層；獨立的執行檔，由 `zig build actool` 建置 |
-| `src/jimpactor.zig` | Jimpactor 本機 IPC 協定 v1 的用戶端（`devices`、`install`） |
-| `src/scaffold.zig` | `idl init`（原始碼由 `build.zig` 從 `examples/` 內嵌） |
-| `src/fsutil.zig` | 與 Xcode 共用的探索規則、路徑驗證、符號連結檢查 |
-| `src/diag.zig` | 唯一面向使用者的錯誤訊息通道 |
+| `src/xmldom.zig` | 基於 zig-xml 串流讀取器的輕量 DOM |
+| `tools/idl-actool` | AssetKit 的 Swift 包裝函式；獨立可執行檔，由 `zig build actool` 建置 |
+| `src/jimpactor.zig` | Jimpactor 本機 IPC 協定 v1 的客戶端（`devices`、`install`） |
+| `src/scaffold.zig` | `idl init`（來源由 `build.zig` 從 `examples/` 嵌入） |
+| `src/fsutil.zig` | 與 Xcode 共用的發現規則、路徑驗證、符號連結檢查 |
+| `src/diag.zig` | 單一使用者可見的錯誤訊息通道 |
+| `src/sys.zig` | 程序層級的 `std.Io` 與環境（在 `main` 中設定一次）、檔案/程序輔助函式 |
 
 ## 相依套件
 
-所有相依套件都已在 `build.zig.zon` 中固定版本：
+所有相依套件皆已固定版本於 `build.zig.zon`：
 
-- **zig-clap**：引數解析與說明文字。
-- **zig-yaml**：YAML 詞法分析器與解析器。`idl` 直接走訪它的 `Tree`，
-  而不使用 `Yaml.parse`，因為具型別的解析器會將 `16.10` 強制轉換成
-  浮點數，並丟失引號。
-- **libplist**（libimobiledevice）：讀寫 XML、二進位、JSON 與
-  OpenStep 格式的 plist。它以 `git+https://…#2.8.1`（固定在某個 commit）取得，
-  並由 `build.zig` 中的 `buildLibplist` 以 C 原始碼編譯，而不使用其
-  autotools 建置。只建置 C 核心，不建置 libplist++。
-- **zig-xml**（ianprime0509）：用於 Interface Builder 文件的 XML 讀取器。
-  固定在最後一個支援 Zig 0.14 的 commit。
-- **AssetKit**（xtool-org）：將 `.xcassets` 轉為 `Assets.car`，僅供
-  `tools/idl-actool` 使用（Swift 套件，固定在 1.0.0）。它不會連結進
-  `idl`。
-- **Zig std**：deflate、CRC-32、SHA-1、JSON 與行程。除了連到 127.0.0.1 上的 Jimpactor 之外，`idl` 不會發出
-  任何網路請求。
+- **zig-clap**：參數解析與說明文字。
+- **zig-yaml**：YAML 詞法分析器與解析器，固定版本為上游 `main`（0.3.0；上游無 0.17 版）的 Zig 0.17 移植版。`idl` 直接遍歷其 `Tree`，而非使用 `Yaml.parse`，因為型別化解析器會將 `16.10` 強制轉換為浮點數並遺漏引號。
+- **libplist**（libimobiledevice）：讀取與寫入 XML、二進位、JSON 和 OpenStep plists。它以 `git+https://…#2.8.1` 取得（固定版本至特定提交），並由 `build.zig` 中的 `buildLibplist` 從 C 原始碼編譯，而非使用其 autotools 建構。僅建構 C 核心，不包含 libplist++。
+- **zig-xml**（ianprime0509）：Interface Builder 文件的 XML 讀取器。固定版本為 0.2.2（Zig 0.16/0.17）。
+- **AssetKit**（xtool-org）：將 `.xcassets` 轉換為 `Assets.car`，僅由 `tools/idl-actool` 使用（Swift 套件，固定版本為 1.0.0）。它未連結至 `idl`。
+- **Zig std**：deflate、CRC-32、SHA-1、JSON、處理程序與 `translate-c`（`plist.h` 由 `build.zig` 轉換；Zig 0.16+ 無 `@cImport`）。`idl` 僅向 Jimpactor 發出網路請求，目標為 127.0.0.1。
 
-## 設計筆記
+## 設計注意事項
 
-- **確定性的程式碼產生。** Xcode 物件 ID 為
-  `SHA1("pbxprojgen:<section>:<key>")[0..12]`，因此相同的輸入永遠產生
-  相同的 `project.pbxproj`。底層 ID 與早期的
-  Python 產生器保持相容；特定設定檔的設定則刻意擴充了輸出。
-- **安全發佈。** 新的 `.xcodeproj` 會寫入私有的同層
-  資料夾，再以相對於資料夾 FD、不跟隨符號連結的
-  操作（`fstatat(AT_SYMLINK_NOFOLLOW)`、`openat(O_NOFOLLOW)`、
-  `renameat`）移到定位。因此，在最後一刻被換入的符號連結無法
-  重新導向寫入。單元測試涵蓋了這一點。
-- **絕不覆寫手寫檔案。** 產生的原始碼樹檔案帶有
-  標記，沒有標記的檔案則不會被動到。
-- **編譯前先預檢。** 在任何資源編譯器執行之前，會先探測所有選定的工具；
-  在應用程式編譯開始之前，會先準備所有資源計畫。嚴格模式會拒絕不支援或遺漏的輸入。
-- **增量建置。** 每個物件檔都有 `.cmd` 命令／工具指紋，
-  而 clang 的 `-MMD` depfile 會列出標頭檔。資源使用 SHA-256 內容定址的
-  快取項目，並在命中時驗證其輸出樹。打包／簽署／ZIP 僅在
-  輸入指紋以及 payload 與 IPA 的完整性都相符時才會略過。
-- **鎖定。** Build／check／gen／clean 會在 `.idl/build.lock` 中持有 OS 建議性鎖。
-  清除時絕不會 unlink 鎖定檔；關閉描述子即釋放
-  鎖。建置會在修改輸出之前取得所有選定的鎖。
-- **設定檔產生。** YAML 對應表會深度合併成解析後的 debug／release
-  目標。每個設定檔的中繼資料寫在 `.idl/<profile>/` 之下；Xcode 會取得
-  兩個設定檔，而 xtool 的資訊清單則描述選定的設定檔。
-- **可重現的 IPA。** 項目會排序、時間戳記固定，且 Unix
-  模式會保留。只有在能讓項目變小時才使用 Deflate。
-- **限定範圍的環境。** swiftly 的 bin 資料夾會附加在 `PATH` 之後，而非
-  放在前面，而且只用於傳給子行程的環境。主機
-  工具保有優先權。
+- **確定性程式碼產生。** Xcode 物件 ID 為
+  `SHA1("pbxprojgen:<section>:<key>")[0..12]`，因此相同的輸入總是會產生
+ 相同的 `project.pbxproj`。低層級 ID 保留與早期 Python 產生器的相容性；設定檔特定的設定有意地擴充輸出內容。
+- **安全發布。** 新的 `.xcodeproj` 寫入私有相鄰目錄，並透過目錄 FD 相對、不跟隨符號連結的操作（`fstatat(AT_SYMLINK_NOFOLLOW)`、`openat(O_NOFOLLOW)`、
+  `renameat`）移至正確位置。因此，最後時刻交換的符號連結不會重定向寫入動作。單元測試涵蓋此部分。
+- **永不覆蓋手寫檔案。** 產生的原始碼樹狀結構檔案帶有標記，沒有該標記的檔案會保持不變。
+- **編譯前預檢。** 所有選定的工具會在任何資源編譯器執行之前進行探測；所有資源計畫會在應用程式編譯開始之前準備完畢。嚴格模式會拒絕不支援或遺漏的輸入。
+- **增量建構。** 每個物件都有 `.cmd` 命令/工具指紋，且 clang 的 `-MMD` 相依檔案列出標頭檔。資源使用 SHA-256 內容尋址快取項目，並在命中時驗證其輸出樹狀結構。僅在輸入指紋以及有效載荷與 IPA 完整性相符時，跳過捆綁/簽署/ZIP。
+- **鎖定機制。** 建構/檢查/產生/清除會在 `.idl/build.lock` 中持有作業系統建議性鎖定。清除期間不會解除連結鎖定檔案；關閉描述元即可釋放鎖定。建構會在修改輸出內容之前取得所有選定的鎖定。
+- **設定檔產生。** YAML 將深層合併映射至已解析的 debug/release 目標。每個設定檔的中繼資料寫入 `.idl/<profile>/` 下；Xcode 接收兩個設定檔，而 xtool 的清單描述所選的設定檔。
+- **可重現的 IPA。** 項目已排序，時間戳記固定，且保留 Unix 模式。僅在使項目變小時才使用 Deflate。
+- **範圍環境。** swiftly 的二進位目錄附加至 `PATH` 末尾，而非前置，且僅傳遞給子處理程序的環境中。主機工具保持優先順序。
