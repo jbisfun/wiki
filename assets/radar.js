@@ -1,12 +1,13 @@
 // Reports: select text on a docs page, right-click, and report that source line
 // (a cpull issue anchored to it, in its repo). Rendered markdown carries
-// data-sourcepos ("line:col-line:col", cpull src/wiki/markdown.zig); <main> carries the repo
+// data-sourcepos ("line:col-line:col", src/markdown.zig); <main> carries the repo
 // and file and the menu markup is templates/partials/radar.html.
 //
-// On the static site the menu copies the `pull cpull report` command that files
-// it. When cpull serves the wiki live (the page has <meta name="cpull-wiki">,
+// On the static site the menu copies the `radar add` command that files it.
+// When `wiki serve` serves the wiki live (the page has <meta name="cpull-wiki">,
 // see forge.js), the menu also takes a note and files the report right away
-// through cpull's wiki api, with a toast linking to the new issue.
+// through the wiki server (POST /_forge/report, which asks radar), with a
+// toast linking to the new issue.
 import Dropdown from "bootstrap/js/dist/dropdown";
 import Toast from "bootstrap/js/dist/toast";
 import ClipboardJS from "clipboard";
@@ -109,7 +110,7 @@ if (radar) {
     event.preventDefault();
     const { radarRepo, radarFile } = page.dataset;
     target = { repo: radarRepo, file: radarFile, line, quote: text };
-    command = `pull cpull report ${quote(radarRepo)} ${quote(radarFile)} ${line} --source wiki --quote ${quote(text)}`;
+    command = `radar add ${quote(radarRepo)} ${quote(radarFile)} ${line} --source wiki -q ${quote(text)}`;
     radar.querySelector("[data-radar-command]").textContent = api ? `${radarRepo}/${radarFile}:${line}` : command;
     cursor = new DOMRect(event.clientX, event.clientY, 0, 0);
     menu.show();
@@ -118,6 +119,6 @@ if (radar) {
   });
 
   new ClipboardJS("[data-radar-copy]", {
-    text: (button) => (button.dataset.radarCopy === "note" ? `${command} --note ''` : command),
+    text: (button) => (button.dataset.radarCopy === "note" ? `${command} -n ''` : command),
   }).on("success", () => menu.hide());
 }

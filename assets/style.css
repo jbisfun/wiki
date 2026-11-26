@@ -484,3 +484,13 @@ html[data-bs-theme="dark"] .toast { --bs-toast-bg: #2e3034; --bs-toast-border-co
    WCAG AA (4.5:1); the same hue, lightened, is 4.9:1. Light mode keeps syntect's
    InspiredGitHub colours for parity with the old site. */
 [data-bs-theme="dark"] .hl-comment, [data-bs-theme="dark"] .hl-punctuation.hl-definition.hl-comment { color: #8a97a3; }
+
+/* The workspace tool switcher (Forge · CI · Wiki · Radar, theme macros.html `tools`): only on
+   pages `wiki serve` serves, right after the brand, behind a double etched divider (kept in sync
+   with the theme package's style.css); the tools not running are dimmed. */
+.wiki-globalnav .tool-switcher { border-right: 1px solid rgba(0, 0, 0, 0.5); box-shadow: 1px 0 0 rgba(255, 255, 255, 0.1); padding-right: 3px; }
+.wiki-globalnav .tool-switcher ~ .navbar-collapse > .navbar-nav:first-child { margin-left: 0 !important; }
+.wiki-globalnav .tool-switcher .nav-link { padding-inline: 0.6rem; }
+.wiki-globalnav .tool-switcher .nav-link.active { background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06)); box-shadow: inset 0 -2px 0 var(--wiki-select-top, #5a9ae6), 1px 0 0 rgba(255, 255, 255, 0.1); }
+.wiki-globalnav .tool-switcher .tool-off { opacity: 0.45; cursor: default; }
+.wiki-globalnav .tool-switcher .tool-off:hover { background: none; }

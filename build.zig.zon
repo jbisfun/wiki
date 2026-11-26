@@ -1,0 +1,41 @@
+.{
+    .name = .wiki,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.17.1",
+    .dependencies = .{
+        .cmark_gfm = .{
+            .url = "https://github.com/github/cmark-gfm/archive/refs/tags/0.29.0.gfm.13.tar.gz",
+            .hash = "N-V-__8AACaGFwDmjLKFjd0jlhijuVlTuOCGoRVvp406CsLD",
+        },
+        .toml = .{
+            .url = "git+https://github.com/sam701/zig-toml?ref=zig-0.17#4a13e49ce7d19ac2df8b87962d9f23c0f5dd5bdd",
+            .hash = "toml-0.3.0-bV14BRmkAQDSILPPyXc31aAXPtJa1Uh8Frug3i6InAUc",
+        },
+        .superhtml = .{
+            .url = "git+https://github.com/kristoff-it/superhtml#b00f3d25e7e8103d18c08961ca39be7c282923ed",
+            .hash = "superhtml-0.7.1-Y7MdPL6bJgC9-jD4-EKen7iR9BOO6PGeWNQVlpWa-8Xx",
+        },
+        .uucode = .{
+            .url = "git+https://github.com/jacobsandlund/uucode#1fb73433bba5d93366c57f23ff2e9d7939746500",
+            .hash = "uucode-0.2.0-ZZjBPm6FVgBcY-79AHV8ckQj86z0JwOyVyj89VeZrEiv",
+        },
+        .clap = .{
+            .url = "git+https://github.com/Hejsil/zig-clap#05faf3905e8548f5cc269a8836e154065e70128d",
+            .hash = "clap-0.12.0-oBajB4XpAQCF1WRKnD5KOKPsnwwT_NNdAJ7Ww3irYJac",
+        },
+        // `wiki mcp`
+        .parley = .{
+            .url = "git+https://github.com/pedronaugusto/parley#3dffee3a0e074d6cfb5be647f5a4694c2fd9ad9d",
+            .hash = "parley-0.8.0-x3fwY1idCwCLQPMDQif0tjRyIbXpzYaMJ2l0mVuqHSUp",
+        },
+        // jbisfun/theme: zig-vin, the workspace tool bar, discovery and the
+        // highlighter; the pull workspace's sibling checkout (~/jbisfun/theme)
+        .theme = .{ .path = "../theme" },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .fingerprint = 0x22cddc065f471d9e,
+}

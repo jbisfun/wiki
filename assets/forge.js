@@ -1,10 +1,12 @@
-// The wiki and the forge: when cpull serves the wiki live (at /wiki/), the
-// server adds <meta name="cpull-wiki" content="<api>"> to every page, and this
-// script shows on each repo page its cpull repo page, open issues and CI
-// status, on doc pages the open reports anchored to that file, with their
-// lines highlighted, and on the home page each repo's open issues. The static
-// site (GitHub Pages) has no such meta tag, so nothing here runs there.
-// Server side: cpull src/wiki/forge.zig.
+// The wiki and the forge: when `wiki serve` serves the wiki live, it adds
+// <meta name="cpull-wiki" content="/_forge"> to every page, and this script
+// shows on each repo page its cpull repo page, open issues and CI status, on
+// doc pages the open reports anchored to that file, with their lines
+// highlighted, and on the home page each repo's open issues. The static site
+// (GitHub Pages) has no such meta tag, so nothing here runs there. Server
+// side: src/forge.zig, which asks cpull, radar and idlci; every link it
+// returns is absolute (another tool's server), and a tool that isn't running
+// answers 503, which reads here as "no forge".
 const api = document.querySelector('meta[name="cpull-wiki"]')?.content;
 const main = document.querySelector("main[data-wiki-repo]");
 
@@ -93,14 +95,14 @@ const placeFlags = (reports) => {
 };
 
 const ciBadges = async (repo) => {
-  const response = await fetch("/ci/api/projects").catch(() => null);
+  const response = await fetch(`${api}/ci/projects`).catch(() => null);
   if (!response?.ok) return [];
   const projects = (await response.json()).filter((p) => p.repo === repo);
   return projects.map((p) => {
     const status = p.running ? "running" : (p.last_build?.status ?? "no builds");
     const label = projects.length > 1 ? `CI ${p.name}: ${status}` : `CI: ${status}`;
     const dot = el("span", { class: `wiki-ci-dot wiki-ci-${status.replace(/\W+/g, "-")}`, "aria-hidden": "true" });
-    return el("a", { class: "badge text-bg-secondary text-decoration-none", href: `/ci/projects/${encodeURI(p.path)}` }, dot, label);
+    return el("a", { class: "badge text-bg-secondary text-decoration-none", href: p.url }, dot, label);
   });
 };
 

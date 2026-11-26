@@ -8,9 +8,9 @@ The wiki turns every repo in a [pull](https://github.com/jbisfun/pull) workspace
 
 ## How it works
 
-The generator is part of [cpull](https://github.com/jbisfun/cpull), the workspace's forge (`src/wiki`, Zig; its own notes are in cpull's `docs/wiki.md`). This repo holds what it builds from: `wiki.toml`, `templates/`, `pages/`, `assets/`, `locales/` and `translations/`. cpull finds it as `<workspace>/wiki`, and writes into `<workspace>/.pull/cpull/wiki/` (`build/` for state and code references, `dist/` for the site; `$CPULL_WIKI_DIR` moves both).
+The generator is the `wiki` program in this repo (`src/`, Zig 0.17, built with `zig build`); the same repo holds what it builds from: `wiki.toml`, `templates/`, `pages/`, `assets/`, `locales/` and `translations/`. It finds the data as `<workspace>/wiki`, and writes into `<workspace>/.pull/wiki/` (`build/` for state and code references, `dist/` for the site; `$WIKI_DIR` moves both). It shares the workspace tools' theme package (`../theme`: the template engine, the tool bar and the highlighter).
 
-`cpull wiki build` runs these steps:
+`wiki build` runs these steps:
 
 1. **Collect** (`collect.zig`): runs `pull status --json` and keeps every cloned repo, with its README, its GitHub URL (from the `origin` remote) and its table from `wiki.toml`.
 2. **Code reference** (`apidoc.zig`), into `build/api/<repo>/<tool>/`:
@@ -25,9 +25,24 @@ The generator is part of [cpull](https://github.com/jbisfun/cpull), the workspac
    - Every other file in `docs/` is copied as an asset.
    - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL). Links are rewritten in the HTML itself, so links in raw HTML are covered too.
 5. **Languages** (`translate.zig`, `fluent.zig`): Step 4 runs once per language in `wiki.toml` `[i18n]`; see [Languages](#languages).
-6. **Publish** (`cpull wiki publish`): builds, then mirrors `dist/` into the `jbisfun.github.io` repo (`$WIKI_PUBLISH_DIR`) with rsync and stages it. The pull precommit hook runs it.
+6. **Publish** (`wiki publish`): builds, then mirrors `dist/` into the `jbisfun.github.io` repo (`$WIKI_PUBLISH_DIR`) with rsync and stages it. The pull precommit hook runs it.
 
-When the workspace server runs (`pull cpull open --web-listen ADDR`), it serves the site live at `/wiki/`, rebuilding what changed as pages are requested. Live pages also show each repo's cpull issues, reports and CI status, and the right-click report menu files a report straight away (`assets/forge.js`, `assets/radar.js`); the published site only offers to copy the `pull cpull report` command.
+Every build also writes `build/pages.json`, each repo's entry page and the page of each of its README/docs files, which the server and the MCP server answer from.
+
+## The live site
+
+`wiki serve --listen 127.0.0.1:8090` (the workspace's `wiki` pull job) serves the site at `/`, rebuilding what changed as pages are requested (at most every 5 seconds; a `wiki build` running at the same time holds `build.lock`, and pages keep being served meanwhile). It announces itself in `.pull/wiki/serve.addr`, so the other workspace tools link to it. The pages it serves (never `dist/` itself, so the published site stays static) get two additions: the workspace tool bar after the brand (Forge · CI · Wiki · Radar, the tools that aren't running dimmed) and `<meta name="cpull-wiki" content="/_forge">`, which turns on the forge features of `assets/forge.js` and `assets/radar.js`: each repo's cpull page, issues, reports and CI status, the reports anchored to a page with their lines flagged, and filing a report from the right-click menu straight away. The scripts only call the wiki's own server, which asks the other tools (`src/forge.zig`):
+
+| Route | Answers from |
+| - | - |
+| `GET /api/health` | `{ok, tool, root, version}` |
+| `GET /api/pages?repo=R` | `build/pages.json`: `{repo, url, docs: [{file, url}]}` |
+| `GET /_forge/page?repo=R&file=F` | cpull `/api/repos` + radar `/api/reports?repo=R&file=F` (cpull's when radar is down) |
+| `GET /_forge/repos` | cpull `/api/repos` |
+| `GET /_forge/ci/projects` | idlci `/api/projects` |
+| `POST /_forge/report` | radar `POST /api/reports` (source `wiki`) |
+
+Links in the answers are absolute, on the other tool's server. A tool that isn't running (or runs for another workspace) answers 503, which the scripts take for "no forge". The published site's report menu only copies the `radar add` command.
 
 ## What gets regenerated
 
@@ -38,10 +53,10 @@ Inputs are identified the way git identifies them (`state.zig`), and `build/stat
 | A repo's code reference | the repo's HEAD tree id, the patch id of its uncommitted changes, or its `wiki.toml` settings |
 | A repo's pages | the blob id of any of its page sources, its code reference keys, or the global key |
 | A repo's pages in another language | the same, plus its translations and translated strings |
-| Everything | the global key: blob ids of `templates/` and `locales/`, the locale list, the list of repos in the navbar, the site title, or the `cpull` binary |
-| `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `cpull` binary |
+| Everything | the global key: blob ids of `templates/` and `locales/`, the locale list, the list of repos in the navbar, the site title, or the `wiki` binary |
+| `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `wiki` binary |
 
-`.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `cpull wiki build --force` (`just rebuild`) ignores the state.
+`.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `wiki build --force` (`just rebuild`) ignores the state. The first build after the move from cpull starts from a copy of cpull's `.pull/cpull/wiki`, so code references aren't regenerated.
 
 ## wiki.toml
 
@@ -66,7 +81,7 @@ Repos in a pull group (`fossify-ios/notes-ios`) are listed by their own name (`n
 
 English is the source language, at the site root. Every locale in `[i18n] locales` (now `zh-TW`) is a full copy of the site under its lowercased tag (`/zh-tw/...`), with a language menu in the header and `hreflang` links between the copies. Code references stay English and are shared.
 
-- **Chrome** (navbar, sidebar, footer, home page): [Fluent](https://projectfluent.org) messages in `locales/<tag>/main.ftl` (cpull's `fluent.zig` reads the Fluent subset these files use). Templates call `t('key', name=value)`. A new locale needs a `locales/<tag>/main.ftl` with every key in `locales/en/main.ftl`.
+- **Chrome** (navbar, sidebar, footer, home page): [Fluent](https://projectfluent.org) messages in `locales/<tag>/main.ftl` (`src/fluent.zig` reads the Fluent subset these files use). Templates call `t('key', name=value)`. A new locale needs a `locales/<tag>/main.ftl` with every key in `locales/en/main.ftl`.
 - **Pages** (READMEs, `docs/`) and the `wiki.toml` descriptions and categories are machine-translated through any OpenAI-compatible chat API (`[i18n.translator]`: `base_url`, `model`, `api_key_env`, `reasoning_effort`, `jobs`, `chunk`; local Ollama by default). Pages are split along their markdown structure into chunks of at most `chunk` characters; the prompt keeps code, links, HTML and template tags as they are.
 - **Cache**: `translations/<tag>/<repo>/<path>` plus `sources.json` (page -> blob id of the English it came from) and `strings.json`, committed with the wiki. A page goes back to the translator only when its English blob id changes; until then the old translation is shown (with a warning in the build log). Translations of deleted pages are pruned.
 - Translating is opt-in: only `WIKI_TRANSLATE=1` calls the translator, because it loads the local model. Without it, or when the translator can't be reached, the build uses the cache alone: pages without a translation are shown in English with a notice. Translated pages carry a "machine-translated" notice linking the English original, and the report menu is English-only.
@@ -75,19 +90,20 @@ English is the source language, at the site root. Every locale in `[i18n] locale
 ## Commands
 
 ```sh
-just build     # pnpm install, then cpull wiki build
+just build     # pnpm install, zig build, then wiki build
 just rebuild   # the same, ignoring build/state.json
 just publish   # build, then copy into ../jbisfun.github.io and git add
-just serve     # build and serve dist/ on http://localhost:8000
-just clean     # cpull wiki clean
+just serve     # build and serve live on http://127.0.0.1:8090
+just clean     # wiki clean
+just install   # zig build -Doptimize=ReleaseSafe --prefix ~/.local
 ```
 
-`cpull wiki build|publish|clean` work the same from anywhere in the workspace (`--workspace DIR` picks another one). For the site with its live forge features, run the workspace server instead (`pull cpull open --web-listen 127.0.0.1:8080`, then `/wiki/`).
+`wiki build|publish|clean|serve|mcp` work the same from anywhere in the workspace (`--root DIR` picks another one). `wiki mcp` is an MCP server on stdio for agents, with `wiki_build` (an incremental build; returns what changed) and `wiki_pages` (a repo's pages on the live server); the pullfile's `mcp_servers` registers it.
 
-Environment: `PULL_ROOT` (workspace root), `CPULL_WIKI_DIR` (build output, default `<root>/.pull/cpull/wiki`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`, `WIKI_TRANSLATE=1` (call the translator), `WIKI_ESBUILD` (another esbuild binary), and the variable named by `[i18n.translator] api_key_env`.
+Environment: `PULL_ROOT` (workspace root), `WIKI_DIR` (build output, default `<root>/.pull/wiki`), `CPULL_ADDR`/`IDLCI_ADDR`/`RADAR_ADDR` (where `wiki serve` reaches the other tools, default their `.pull/<tool>/serve.addr`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`, `WIKI_TRANSLATE=1` (call the translator), `WIKI_ESBUILD` (another esbuild binary), and the variable named by `[i18n.translator] api_key_env`.
 
 ## pull hook
 
-The workspace `pullfile.plist` runs `cpull wiki publish` as a `precommit` hook, so `pull commit` lands the regenerated site in `jbisfun.github.io` in the same commit and `pull push` deploys it to GitHub Pages.
+The workspace `pullfile.plist` runs `wiki publish` as a `precommit` hook, so `pull commit` lands the regenerated site in `jbisfun.github.io` in the same commit and `pull push` deploys it to GitHub Pages.
 
 See [Templating](templating.jinja) for writing pages.

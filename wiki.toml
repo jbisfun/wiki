@@ -213,5 +213,5 @@ description = "Per-project Homebrew packages, declared in the pullfile."
 category = "Workspace tools"
 
 [repos.wiki]
-description = "Templates, pages and assets of this site, which cpull builds from every repo in the workspace."
+description = "The generator of this site, with its templates, pages and assets: one static site from every repo in the workspace."
 category = "Workspace tools"

@@ -1,34 +1,43 @@
 # Static wiki from the docs/ of every repo in the pull workspace.
-# The generator is cpull's (`cpull wiki`, src/wiki in jbisfun/cpull); this repo
-# holds its data, and this file only installs the npm side and wires it up.
+# `wiki` (src/, Zig) is the generator, the live server and the MCP server; this
+# file installs the npm side (esbuild, bootstrap, clipboard, jsdoc) and wires it up.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# where cpull writes the site (cpull wiki honours the same variable)
-dist := env_var_or_default("CPULL_WIKI_DIR", "../.pull/cpull/wiki") + "/dist"
+wiki := "zig-out/bin/wiki"
 
 default: build
 
 # Install the client packages esbuild bundles (bootstrap, clipboard), esbuild itself and jsdoc.
-install:
+deps:
     pnpm install --frozen-lockfile
 
-# Site in <workspace>/.pull/cpull/wiki/dist; only repos whose sources changed (by git object id) are regenerated.
-build: install
-    cpull wiki build
+# The binary in zig-out/bin.
+compile:
+    zig build
+
+# Site in <workspace>/.pull/wiki/dist; only repos whose sources changed (by git object id) are regenerated.
+build: deps compile
+    {{wiki}} build
 
 # Rebuild everything, ignoring the build state.
-rebuild: install
-    cpull wiki build --force
+rebuild: deps compile
+    {{wiki}} build --force
 
-# Build and stage the site in ../jbisfun.github.io (the pull precommit hook runs `cpull wiki publish`).
-publish: install
-    cpull wiki publish
+# Build and stage the site in ../jbisfun.github.io (the pull precommit hook runs `wiki publish`).
+publish: deps compile
+    {{wiki}} publish
 
-# Build and serve the static site on localhost (the live one, with the forge features, is
-# the workspace server's /wiki/: pull cpull open --web-listen 127.0.0.1:8080).
-serve port="8000": build
-    python3 -m http.server {{port}} --directory {{dist}}
+# Serve the live site with the forge features (the workspace's `wiki` pull job does this on 8090).
+serve listen="127.0.0.1:8090": deps compile
+    {{wiki}} serve --listen {{listen}}
 
 clean:
-    cpull wiki clean
+    {{wiki}} clean
+
+test:
+    zig build test
+
+# Install the release binary to ~/.local/bin.
+install:
+    zig build -Doptimize=ReleaseSafe --prefix ~/.local
