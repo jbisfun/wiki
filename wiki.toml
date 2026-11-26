@@ -60,7 +60,7 @@ description = "pull's changes, commit box and jobs as ycode panels."
 category = "ycode"
 
 [repos.ycode-radar]
-description = "radar's reports as a ycode panel, filed from the editor."
+description = "Line-anchored reports (cpull issues) as a ycode panel, filed from the editor."
 category = "ycode"
 
 [repos.apple-codesign]

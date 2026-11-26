@@ -1,5 +1,5 @@
-// Radar: select text on a docs page, right-click, and copy the `radar add` command
-// that files it. Rendered markdown carries data-sourcepos ("line:col-line:col",
+// Reports: select text on a docs page, right-click, and copy the `pull cpull report`
+// command that files it (a cpull issue anchored to that source line, in its repo). Rendered markdown carries data-sourcepos ("line:col-line:col",
 // src/markdown.rs); <main> carries the repo and file and the menu markup is
 // templates/partials/radar.html.
 import Dropdown from "bootstrap/js/dist/dropdown";
@@ -37,7 +37,7 @@ if (radar) {
     if (!line) return;
     event.preventDefault();
     const { radarRepo, radarFile } = page.dataset;
-    command = `radar add ${quote(radarRepo)} ${quote(radarFile)} ${line} --source wiki --quote ${quote(text)}`;
+    command = `pull cpull report ${quote(radarRepo)} ${quote(radarFile)} ${line} --source wiki --quote ${quote(text)}`;
     radar.querySelector("[data-radar-command]").textContent = command;
     cursor = new DOMRect(event.clientX, event.clientY, 0, 0);
     menu.show();
