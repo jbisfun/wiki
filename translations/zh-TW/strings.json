@@ -18,6 +18,7 @@
   "One commit, sync and push across every repo in the workspace.": "在工作區的所有儲存庫間一次提交、同步與推送。",
   "Open radar reports for this workspace.": "本工作區尚未解決的 radar 回報。",
   "Per-project Homebrew packages, declared in the pullfile.": "在 pullfile 中宣告的專案專屬 Homebrew 套件。",
+  "Templates, pages and assets of this site, which cpull builds from every repo in the workspace.": "本網站的範本、頁面與資源；cpull 會從工作區中的每個儲存庫建置本網站。",
   "The FossiOS apps' home-screen widgets, as a WidgetKit extension.": "FossiOS App 的主畫面小工具，以 WidgetKit 延伸功能實作。",
   "The workspace pullfile, copied here on every commit.": "工作區的 pullfile，每次提交時複製到這裡。",
   "Turns off ycode's account and online features.": "關閉 ycode 的帳號與線上功能。",

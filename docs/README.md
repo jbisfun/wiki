@@ -1,6 +1,6 @@
 # Overview
 
-`wiki` turns every repo in a [pull](https://github.com/jbisfun/pull) workspace into one static site, published at <https://jbisfun.github.io>. Each repo gets:
+The wiki turns every repo in a [pull](https://github.com/jbisfun/pull) workspace into one static site, published at <https://jbisfun.github.io>. Each repo gets:
 
 - its `README.md` as the entry page (`<repo>/index.html`),
 - the pages in its `docs/` folder (`<repo>/docs/...`),
@@ -8,36 +8,40 @@
 
 ## How it works
 
-`wiki build` (a Rust binary, `src/`) runs these steps:
+The generator is part of [cpull](https://github.com/jbisfun/cpull), the workspace's forge (`src/wiki`, Zig; its own notes are in cpull's `docs/wiki.md`). This repo holds what it builds from: `wiki.toml`, `templates/`, `pages/`, `assets/`, `locales/` and `translations/`. cpull finds it as `<workspace>/wiki`, and writes into `<workspace>/.pull/cpull/wiki/` (`build/` for state and code references, `dist/` for the site; `$CPULL_WIKI_DIR` moves both).
 
-1. **Collect** (`collect.rs`): runs `pull status --json` and keeps every cloned repo, with its README, its GitHub URL (from the `origin` remote) and its table from `wiki.toml`.
-2. **Code reference** (`apidoc.rs`), into `.build/api/<repo>/<tool>/`:
+`cpull wiki build` runs these steps:
+
+1. **Collect** (`collect.zig`): runs `pull status --json` and keeps every cloned repo, with its README, its GitHub URL (from the `origin` remote) and its table from `wiki.toml`.
+2. **Code reference** (`apidoc.zig`), into `build/api/<repo>/<tool>/`:
    - Rust: `cargo doc --no-deps` (rustdoc) when the repo has a `Cargo.toml`, using the repo's own target dir.
    - Lua: [LDoc](https://github.com/lunarmodules/ldoc) (`apt install lua-ldoc`) over tracked `*.lua` files, except `*.x.lua` hook scripts. Only `---` doc comments are picked up (`-- @module name` on the file's first one).
    - JavaScript: [JSDoc](https://jsdoc.app) (a wiki dev dependency) over tracked `*.js`/`*.mjs` in repos with a `package.json` and `/** */` comments.
    A missing tool or a failing run only warns, so the site still builds.
-3. **Assets** (`bundle.rs`): an embedded [rolldown](https://rolldown.rs) bundles and minifies `assets/main.js` with its npm imports (Bootstrap's collapse and dropdown, clipboard.js). [lightningcss](https://lightningcss.dev) bundles `assets/style.css` with Bootstrap's CSS, plus the code highlighting CSS that syntect generates from its light and dark themes. Output goes to `dist/_assets`.
-4. **Render** (`render.rs`) into `dist/<repo>/...`. mdBook projects (a `docs/book.toml`) use the book's `src` folder and its `SUMMARY.md` as the docs sidebar.
-   - `*.md` with [comrak](https://github.com/kivikakk/comrak): GFM tables and autolinks, smart punctuation, `{#id}` heading attributes, and highlighting by syntect at build time. Every block carries `data-sourcepos`, so Radar can map a selection back to its source line.
-   - `*.jinja` with [minijinja](https://github.com/mitsuhiko/minijinja). See [Templating](templating.jinja).
+3. **Assets** (`bundle.zig`): [esbuild](https://esbuild.github.io) (a wiki dev dependency, so `pnpm install` brings it) bundles and minifies `assets/main.js` with its npm imports (Bootstrap's collapse, dropdown and toast, clipboard.js) and `assets/style.css` with Bootstrap's CSS, then appends the code highlighting CSS (syntect's InspiredGitHub light and base16-ocean dark, kept for parity with the old site). `assets/icons/` is copied as is. Output goes to `dist/_assets`.
+4. **Render** (`render.zig`) into `dist/<repo>/...`. mdBook projects (a `docs/book.toml`) use the book's `src` folder and its `SUMMARY.md` as the docs sidebar.
+   - `*.md` with [cmark-gfm](https://github.com/github/cmark-gfm): GFM tables and autolinks, smart punctuation, `{#id}` heading attributes, and highlighting by tree-sitter at build time. Every block carries `data-sourcepos`, so the report menu can map a selection back to its source line.
+   - `*.jinja` with [zig-vin](https://github.com/deatil/zig-vin) (Jinja2 syntax). See [Templating](templating.jinja).
    - Every other file in `docs/` is copied as an asset.
-   - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL). Links are rewritten with lol_html, so links in raw HTML are covered too.
-5. **Languages** (`i18n.rs`, `translate.rs`): Step 4 runs once per language in `wiki.toml` `[i18n]`; see [Languages](#languages).
-6. **Publish** (`wiki publish`): mirrors `dist/` into the `jbisfun.github.io` repo with rsync and stages it.
+   - Links resolve against the repo, so a README linking `docs/setup.md` lands on the rendered page. Links to other repo files go to GitHub (images to their raw URL). Links are rewritten in the HTML itself, so links in raw HTML are covered too.
+5. **Languages** (`translate.zig`, `fluent.zig`): Step 4 runs once per language in `wiki.toml` `[i18n]`; see [Languages](#languages).
+6. **Publish** (`cpull wiki publish`): builds, then mirrors `dist/` into the `jbisfun.github.io` repo (`$WIKI_PUBLISH_DIR`) with rsync and stages it. The pull precommit hook runs it.
+
+When the workspace server runs (`pull cpull open --web-listen ADDR`), it serves the site live at `/wiki/`, rebuilding what changed as pages are requested. Live pages also show each repo's cpull issues, reports and CI status, and the right-click report menu files a report straight away (`assets/forge.js`, `assets/radar.js`); the published site only offers to copy the `pull cpull report` command.
 
 ## What gets regenerated
 
-Inputs are identified the way git identifies them (`state.rs`), and `.build/state.json` keeps the key each piece was last built with:
+Inputs are identified the way git identifies them (`state.zig`), and `build/state.json` keeps the key each piece was last built with:
 
 | Piece | Rebuilt when this changes |
 | - | - |
 | A repo's code reference | the repo's HEAD tree id, the patch id of its uncommitted changes, or its `wiki.toml` settings |
 | A repo's pages | the blob id of any of its page sources, its code reference keys, or the global key |
 | A repo's pages in another language | the same, plus its translations and translated strings |
-| Everything | the global key: blob ids of `templates/` and `locales/`, the locale list, the list of repos in the navbar, the site title, or the `wiki` binary |
-| `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `wiki` binary |
+| Everything | the global key: blob ids of `templates/` and `locales/`, the locale list, the list of repos in the navbar, the site title, or the `cpull` binary |
+| `dist/_assets` | blob ids of `assets/`, `pnpm-lock.yaml`, or the `cpull` binary |
 
-`.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `wiki build --force` (`just rebuild`) ignores the state.
+`.jinja` pages and the home page can show anything about the site, so they are rendered on every build. `cpull wiki build --force` (`just rebuild`) ignores the state.
 
 ## wiki.toml
 
@@ -62,26 +66,28 @@ Repos in a pull group (`fossify-ios/notes-ios`) are listed by their own name (`n
 
 English is the source language, at the site root. Every locale in `[i18n] locales` (now `zh-TW`) is a full copy of the site under its lowercased tag (`/zh-tw/...`), with a language menu in the header and `hreflang` links between the copies. Code references stay English and are shared.
 
-- **Chrome** (navbar, sidebar, footer, home page): [Fluent](https://projectfluent.org) messages in `locales/<tag>/main.ftl`, loaded with fluent-templates. Templates call `t('key', name=value)`. A new locale needs a `locales/<tag>/main.ftl` with every key in `locales/en/main.ftl`.
-- **Pages** (READMEs, `docs/`) and the `wiki.toml` descriptions and categories are machine-translated through any OpenAI-compatible chat API (`[i18n.translator]`: `base_url`, `model`, `api_key_env`, `reasoning_effort`, `jobs`, `chunk`; local Ollama by default), with async-openai. Pages are split along their markdown structure (text-splitter) into chunks of at most `chunk` characters; the prompt keeps code, links, HTML and template tags as they are.
+- **Chrome** (navbar, sidebar, footer, home page): [Fluent](https://projectfluent.org) messages in `locales/<tag>/main.ftl` (cpull's `fluent.zig` reads the Fluent subset these files use). Templates call `t('key', name=value)`. A new locale needs a `locales/<tag>/main.ftl` with every key in `locales/en/main.ftl`.
+- **Pages** (READMEs, `docs/`) and the `wiki.toml` descriptions and categories are machine-translated through any OpenAI-compatible chat API (`[i18n.translator]`: `base_url`, `model`, `api_key_env`, `reasoning_effort`, `jobs`, `chunk`; local Ollama by default). Pages are split along their markdown structure into chunks of at most `chunk` characters; the prompt keeps code, links, HTML and template tags as they are.
 - **Cache**: `translations/<tag>/<repo>/<path>` plus `sources.json` (page -> blob id of the English it came from) and `strings.json`, committed with the wiki. A page goes back to the translator only when its English blob id changes; until then the old translation is shown (with a warning in the build log). Translations of deleted pages are pruned.
-- `WIKI_TRANSLATE=0`, or a translator that can't be reached, builds from the cache alone: pages without a translation are shown in English with a notice. Translated pages carry a "machine-translated" notice linking the English original, and Radar is English-only.
+- Translating is opt-in: only `WIKI_TRANSLATE=1` calls the translator, because it loads the local model. Without it, or when the translator can't be reached, the build uses the cache alone: pages without a translation are shown in English with a notice. Translated pages carry a "machine-translated" notice linking the English original, and the report menu is English-only.
 - `translate = false` or `translate = { files = ["README.md"] }` in a repo's table limits what gets translated (ycode's upstream Zed docs and the radar reports in `issues` stay English).
 
 ## Commands
 
 ```sh
-just build     # pnpm install, then wiki build into dist/
-just rebuild   # the same, ignoring .build/state.json
+just build     # pnpm install, then cpull wiki build
+just rebuild   # the same, ignoring build/state.json
 just publish   # build, then copy into ../jbisfun.github.io and git add
 just serve     # build and serve dist/ on http://localhost:8000
-just clean
+just clean     # cpull wiki clean
 ```
 
-Environment: `PULL_ROOT` (workspace root, default `..`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`, `WIKI_TRANSLATE=0` (no translator calls), and the variable named by `[i18n.translator] api_key_env`.
+`cpull wiki build|publish|clean` work the same from anywhere in the workspace (`--workspace DIR` picks another one). For the site with its live forge features, run the workspace server instead (`pull cpull open --web-listen 127.0.0.1:8080`, then `/wiki/`).
+
+Environment: `PULL_ROOT` (workspace root), `CPULL_WIKI_DIR` (build output, default `<root>/.pull/cpull/wiki`), `WIKI_SKIP` (comma-separated repos to leave out, on top of `skip` in `wiki.toml`), `WIKI_TITLE`, `WIKI_PUBLISH_DIR`, `WIKI_TRANSLATE=1` (call the translator), `WIKI_ESBUILD` (another esbuild binary), and the variable named by `[i18n.translator] api_key_env`.
 
 ## pull hook
 
-The workspace `pullfile.plist` runs `just publish` as a `precommit` hook, so `pull commit` lands the regenerated site in `jbisfun.github.io` in the same commit and `pull push` deploys it to GitHub Pages.
+The workspace `pullfile.plist` runs `cpull wiki publish` as a `precommit` hook, so `pull commit` lands the regenerated site in `jbisfun.github.io` in the same commit and `pull push` deploys it to GitHub Pages.
 
 See [Templating](templating.jinja) for writing pages.

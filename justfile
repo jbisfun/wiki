@@ -1,31 +1,34 @@
 # Static wiki from the docs/ of every repo in the pull workspace.
-# The work is done by the `wiki` binary (src/); this only installs and wires it up.
+# The generator is cpull's (`cpull wiki`, src/wiki in jbisfun/cpull); this repo
+# holds its data, and this file only installs the npm side and wires it up.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-wiki := "cargo run --release --quiet --"
+# where cpull writes the site (cpull wiki honours the same variable)
+dist := env_var_or_default("CPULL_WIKI_DIR", "../.pull/cpull/wiki") + "/dist"
 
 default: build
 
-# Install the client packages rolldown bundles (bootstrap, clipboard) and jsdoc.
+# Install the client packages esbuild bundles (bootstrap, clipboard), esbuild itself and jsdoc.
 install:
     pnpm install --frozen-lockfile
 
-# Site in dist/; only repos whose sources changed (by git object id) are regenerated.
+# Site in <workspace>/.pull/cpull/wiki/dist; only repos whose sources changed (by git object id) are regenerated.
 build: install
-    {{wiki}} build
+    cpull wiki build
 
-# Rebuild everything, ignoring .build/state.json.
+# Rebuild everything, ignoring the build state.
 rebuild: install
-    {{wiki}} build --force
+    cpull wiki build --force
 
-# Build and stage the site in ../jbisfun.github.io (used by the pull precommit hook).
+# Build and stage the site in ../jbisfun.github.io (the pull precommit hook runs `cpull wiki publish`).
 publish: install
-    {{wiki}} publish
+    cpull wiki publish
 
-# Build and serve dist/ on localhost.
+# Build and serve the static site on localhost (the live one, with the forge features, is
+# the workspace server's /wiki/: pull cpull open --web-listen 127.0.0.1:8080).
 serve port="8000": build
-    python3 -m http.server {{port}} --directory dist
+    python3 -m http.server {{port}} --directory {{dist}}
 
 clean:
-    {{wiki}} clean
+    cpull wiki clean
