@@ -1,4 +1,4 @@
-/* Bundled by lightningcss; the code highlighting CSS is generated from syntect themes.
+/* Bundled by esbuild (cpull wiki); syntect's code highlighting CSS is appended to it.
    Look: an Apple internal web tool, circa 2010-2014. Graphite global bar,
    source-list sidebar, white sheets on a pinstripe desk, Lucida Grande/Helvetica,
    glossy gradients, letterpress text shadows. Dark mode is the "pro app"
@@ -382,3 +382,24 @@ code, kbd, pre, samp { font-family: var(--wiki-mono); }
   text-align: left;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Forge features, only when cpull serves the wiki live (assets/forge.js):
+   the repo's cpull links above the page, reported lines marked like a
+   highlighter pen, a flag beside each in the sheet's margin, and the toast
+   after filing a report from the right-click menu. */
+.wiki-content[data-wiki-repo] { position: relative; }
+.wiki-forge .badge { font-size: 0.75rem; }
+::highlight(cpull-report) { background-color: rgba(255, 213, 0, 0.45); }
+[data-bs-theme="dark"] ::highlight(cpull-report) { background-color: rgba(214, 178, 30, 0.35); }
+.wiki-report-flag {
+  position: absolute;
+  left: 0.6rem;
+  width: 0.55rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  border-radius: 2px;
+  background: linear-gradient(#f7d64a, #d9a90b);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.wiki-report-flag:hover { background: linear-gradient(#ffe36b, #e9b917); }
+#cpull-toasts .toast { --bs-toast-bg: var(--wiki-sheet); border-color: var(--wiki-sheet-border); }

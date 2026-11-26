@@ -29,7 +29,7 @@
     <nav class="col-lg-3 col-xl-2 wiki-sidebar collapse d-lg-block border-end py-3" id="sidebar">
       {{ sidebar }}
     </nav>
-    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content"{% if page.radar %} data-radar-repo="{{ repo.name }}" data-radar-file="{{ page.rel }}"{% endif %}>
+    <main class="col-lg-9 col-xl-8 py-4 px-lg-5 wiki-content" data-wiki-repo="{{ repo.name }}"{% if page.radar %} data-radar-repo="{{ repo.name }}" data-radar-file="{{ page.rel }}"{% endif %}>
 {% else %}
     <main class="col-xl-10 mx-auto py-4 wiki-content wiki-wide">
 {% endif %}
