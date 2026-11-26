@@ -1,6 +1,6 @@
 // Reports: select text on a docs page, right-click, and report that source line
 // (a cpull issue anchored to it, in its repo). Rendered markdown carries
-// data-sourcepos ("line:col-line:col", src/markdown.rs); <main> carries the repo
+// data-sourcepos ("line:col-line:col", cpull src/wiki/markdown.zig); <main> carries the repo
 // and file and the menu markup is templates/partials/radar.html.
 //
 // On the static site the menu copies the `pull cpull report` command that files
@@ -43,22 +43,26 @@ if (radar) {
 
   let form = null;
   if (api) {
-    // the live menu: a note and a button that files the report
-    // menus stay light in dark mode (style.css), and so does the note box
+    // the live menu: a note, a button that files the report and one that
+    // copies the command instead (the menu follows the page's light/dark scheme)
     form = make("form", { className: "px-3 pb-2" });
-    form.dataset.bsTheme = "light";
+    const actions = make("div", { className: "wiki-report-actions" });
+    const copy = make("button", { type: "button", className: "btn btn-outline-secondary btn-sm", textContent: "Copy command" });
+    copy.dataset.radarCopy = "";
+    actions.append(make("button", { type: "submit", className: "btn btn-primary btn-sm", textContent: "File report" }), copy);
     form.append(
       make("textarea", { className: "form-control form-control-sm mb-2", name: "note", rows: 3, placeholder: "Note (optional)", ariaLabel: "Note" }),
-      make("button", { type: "submit", className: "btn btn-primary btn-sm", textContent: "File report" }),
+      actions,
     );
-    radar.querySelector("[data-radar-command]").after(form, make("div", { className: "dropdown-divider" }));
-    radar.querySelector('[data-radar-copy="note"]')?.remove();
+    radar.querySelector("[data-radar-command]").after(form);
+    for (const item of radar.querySelectorAll(".dropdown-item[data-radar-copy]")) item.remove();
   }
 
   const toast = (body) => {
     let holder = document.querySelector("#cpull-toasts");
     if (!holder) {
-      holder = make("div", { id: "cpull-toasts", className: "toast-container position-fixed bottom-0 end-0 p-3" });
+      // under the global bar, clear of the page's footer (style.css .tool-toasts)
+      holder = make("div", { id: "cpull-toasts", className: "toast-container position-fixed end-0 p-3 tool-toasts" });
       document.body.append(holder);
     }
     const node = make("div", { className: "toast", role: "status", ariaLive: "polite" });
@@ -75,7 +79,7 @@ if (radar) {
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!target) return;
-    const button = form.querySelector("button");
+    const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     const response = await fetch(`${api}/report`, {
       method: "POST",

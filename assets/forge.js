@@ -98,9 +98,9 @@ const ciBadges = async (repo) => {
   const projects = (await response.json()).filter((p) => p.repo === repo);
   return projects.map((p) => {
     const status = p.running ? "running" : (p.last_build?.status ?? "no builds");
-    const tone = { passed: "success", failed: "danger", running: "info", queued: "info" }[status] ?? "secondary";
     const label = projects.length > 1 ? `CI ${p.name}: ${status}` : `CI: ${status}`;
-    return el("a", { class: `badge text-bg-${tone} text-decoration-none`, href: `/ci/projects/${encodeURI(p.path)}` }, label);
+    const dot = el("span", { class: `wiki-ci-dot wiki-ci-${status.replace(/\W+/g, "-")}`, "aria-hidden": "true" });
+    return el("a", { class: "badge text-bg-secondary text-decoration-none", href: `/ci/projects/${encodeURI(p.path)}` }, dot, label);
   });
 };
 
@@ -114,6 +114,8 @@ const load = async () => {
   const page = await response.json();
   if (!page.repo) return;
 
+  // keep the reports list open across the reload after filing a report
+  const wasOpen = main.querySelector(".wiki-forge-reports")?.open ?? false;
   main.querySelector(".wiki-forge")?.remove();
   const bar = el("div", { class: "wiki-forge d-flex flex-wrap align-items-center gap-2 small mb-3" },
     el("a", { class: "btn btn-sm btn-outline-secondary", href: page.repo.url }, `${page.repo.name} in cpull`),
@@ -123,17 +125,23 @@ const load = async () => {
   bar.append(...(await ciBadges(repo)));
 
   if (page.reports.length) {
-    const list = el("ul", { class: "mb-0 ps-3" });
+    // folded by default: the count, and the list (line, title) on demand
+    const list = el("ul");
     for (const report of page.reports) {
-      const jump = el("a", { href: "#" }, `line ${report.line}`);
+      const jump = el("a", { href: "#", class: "wiki-forge-line" }, `line ${report.line}`);
       jump.addEventListener("click", (event) => {
         event.preventDefault();
         report.block?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
       list.append(el("li", {}, jump, " · ", el("a", { href: report.url }, report.title)));
     }
-    bar.append(el("div", { class: "alert alert-secondary small py-2 mb-0 w-100", role: "note" },
-      el("div", { class: "fw-semibold" }, plural(page.reports.length, "open report on this page", "open reports on this page")), list));
+    const summary = el("summary", {}, el("span", { class: "wiki-flag-dot", "aria-hidden": "true" }, "\u2691 "),
+      plural(page.reports.length, "open report on this page", "open reports on this page"));
+    const details = el("details", { class: "wiki-forge-reports w-100" }, summary, list);
+    details.open = wasOpen;
+    // opening it moves the page down: the margin flags follow
+    details.addEventListener("toggle", () => placeFlags(page.reports));
+    bar.append(details);
   }
   main.prepend(bar);
   showReports(page.reports);
