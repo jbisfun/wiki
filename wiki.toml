@@ -179,6 +179,11 @@ category = "Apple platform"
 description = "An iPhone/iPad driver that runs in the browser over WebUSB."
 category = "Apple platform"
 
+[repos."ferry-webinstaller"]
+title = "Ferry Web Installer"
+description = "Signs and installs iPhone apps from the browser: SwiftUI in wasm, WebUSB, no server."
+category = "Apple platform"
+
 [repos.MacADICore]
 description = "Mac CoreADI emulated on iOS, for anisette headers."
 category = "Apple platform"

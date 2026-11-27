@@ -6,7 +6,6 @@
   "Apple developer sign-in, provisioning, signing and install, in Rust.": "以 Rust 實作的 Apple 開發者登入、佈建、簽署與安裝。",
   "Apple platform": "Apple 平台",
   "Builds iOS apps on Linux from one idlproj.yml.": "在 Linux 上以單一 idlproj.yml 建置 iOS App。",
-  "Builds this site from every repo in the workspace.": "從工作區中的每個儲存庫建置本網站。",
   "FairPlay IPA decryption on device, split out of LiveContainer.": "在裝置上解密 FairPlay IPA，從 LiveContainer 拆分而出。",
   "Files reports against lines of code, for agents and people.": "針對程式碼行回報問題，供代理程式與人使用。",
   "FossiOS": "FossiOS",
